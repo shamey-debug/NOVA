@@ -50,24 +50,12 @@ export default function AdminPage() {
   }, [])
 
   const fetchAll = async () => {
-    const { data: d } = await supabase
-      .from('deposits')
-      .select('*, profiles(full_name, email)')
-      .order('created_at', { ascending: false })
-    setDeposits(d ?? [])
-
-    const { data: u } = await supabase
-      .from('profiles')
-      .select('*, wallets(balance)')
-      .order('created_at', { ascending: false })
-    setUsers(u ?? [])
-
-    const { data: s } = await supabase
-      .from('bot_sessions')
-      .select('*, profiles(full_name, email)')
-      .order('started_at', { ascending: false })
-    setSessions(s ?? [])
-  }
+  const res = await fetch('/api/admin/data')
+  const { deposits, users, sessions } = await res.json()
+  setDeposits(deposits)
+  setUsers(users)
+  setSessions(sessions)
+}
 
   const confirmDeposit = async (deposit: any) => {
     const res = await fetch('/api/admin/confirm-deposit', {
