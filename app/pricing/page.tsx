@@ -1,23 +1,73 @@
-import { CheckCircle2, Star } from 'lucide-react'
-import { SiteNav } from '@/components/site-nav'
-import { Button, Card, SoftPanel } from '@/components/ui/ui'
+import Link from 'next/link'
+import { CheckCircle2 } from 'lucide-react'
 
-const pricing = [
-  { name: 'Starter', price: 'Free', description: 'Perfect for first-time learners who want to understand the market before spending.', features: ['3 lessons', 'Market watchlist', 'Demo dashboard preview', 'Basic glossary'], cta: 'Start Free', featured: false },
-  { name: 'Pro Academy', price: '$19/mo', description: 'Built for structured lessons, guided simulations, and premium learning tools.', features: ['Full lesson library', 'Demo trading simulator', 'Trade journal', 'Progress tracking', 'Private member area'], cta: 'Go Pro', featured: true },
-  { name: 'Mentorship+', price: '$79/mo', description: 'For users who want live reviews, accountability, and a serious learning environment.', features: ['Everything in Pro', 'Weekly live review', 'Priority support', 'Private strategy room'], cta: 'Apply Now', featured: false },
+const plans = [
+  {
+    name: 'Starter',
+    price: '$85',
+    description: 'Minimum deposit to get started with any bot.',
+    features: ['Access to all 3 bots', 'Live P&L dashboard', 'Deposit via BTC or USDT', 'Basic support'],
+    cta: 'Get Started',
+    featured: false,
+  },
+  {
+    name: 'Growth',
+    price: '$500',
+    description: 'Higher capital, higher returns. Best value tier.',
+    features: ['Everything in Starter', 'Priority deposit confirmation', 'Higher daily return potential', 'Dedicated support'],
+    cta: 'Start Growing',
+    featured: true,
+  },
+  {
+    name: 'Elite',
+    price: '$2,000+',
+    description: 'For serious traders who want maximum exposure.',
+    features: ['Everything in Growth', 'Custom P&L targets', 'VIP support', 'Early access to new bots'],
+    cta: 'Go Elite',
+    featured: false,
+  },
 ]
 
 export default function PricingPage() {
   return (
-    <div className="page">
-      <SiteNav />
-      <main className="container section">
-        <div className="section-head"><div className="kicker">Pricing</div><h1 className="h2">Free entry, premium learning, easy upgrade path.</h1><p className="lead">This model lets users enter freely, get value fast, and move up when they are ready for deeper learning and mentorship.</p></div>
-        <div className="pricing-grid">
-          {pricing.map(plan => <Card key={plan.name} className={`pricing-card ${plan.featured ? 'featured' : ''}`}><div>{plan.featured && <div className="badge"><Star size={14} /> Most Popular</div>}<div className="kicker mt-16">{plan.name}</div><div style={{fontSize:'2.4rem',fontWeight:700,marginTop:10}}>{plan.price}</div><p className="lead" style={{fontSize:'1rem'}}>{plan.description}</p><div className="list mt-24">{plan.features.map(feature => <SoftPanel key={feature} className="card-pad"><div style={{display:'flex',gap:10,alignItems:'flex-start'}}><CheckCircle2 size={16} color="#22d3ee" /><span>{feature}</span></div></SoftPanel>)}</div><div className="mt-24"><Button>{plan.cta}</Button></div></div></Card>)}
+    <main className="min-h-screen bg-black text-white px-6 py-20">
+      <div className="max-w-5xl mx-auto">
+
+        <div className="text-center mb-16">
+          <div className="text-xs text-zinc-500 uppercase tracking-widest mb-3">Pricing</div>
+          <h1 className="text-4xl font-bold mb-4">Simple deposit tiers.</h1>
+          <p className="text-zinc-400 max-w-xl mx-auto">No subscriptions. No hidden fees. Deposit your capital, activate a bot, and let it work.</p>
         </div>
-      </main>
-    </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {plans.map(plan => (
+            <div key={plan.name} className={`rounded-2xl p-8 flex flex-col gap-6 border ${plan.featured ? 'border-yellow-500/40 bg-yellow-500/5' : 'border-zinc-800 bg-zinc-900'}`}>
+              {plan.featured && (
+                <div className="text-xs text-yellow-400 font-bold uppercase tracking-widest">⭐ Most Popular</div>
+              )}
+              <div>
+                <div className="text-sm text-zinc-400 mb-1">{plan.name}</div>
+                <div className="text-4xl font-black text-white">{plan.price}</div>
+                <p className="text-sm text-zinc-500 mt-2">{plan.description}</p>
+              </div>
+              <div className="flex flex-col gap-3 flex-1">
+                {plan.features.map(f => (
+                  <div key={f} className="flex items-center gap-3">
+                    <CheckCircle2 size={16} className="text-cyan-400 flex-shrink-0" />
+                    <span className="text-sm text-zinc-300">{f}</span>
+                  </div>
+                ))}
+              </div>
+              <Link href="/signup"
+                className={`text-center py-3 rounded-xl font-bold text-sm transition ${plan.featured ? 'bg-yellow-400 text-black hover:bg-yellow-300' : 'bg-zinc-800 text-white hover:bg-zinc-700'}`}>
+                {plan.cta} →
+              </Link>
+            </div>
+          ))}
+        </div>
+
+        <p className="text-center text-zinc-600 text-sm mt-12">Minimum deposit is $85 · $1 network fee applies · Withdraw anytime</p>
+      </div>
+    </main>
   )
 }
