@@ -308,7 +308,11 @@ export default function Dashboard() {
       body: JSON.stringify({ userId: user.id, amount: amt }),
     })
     setTradeLoading(false)
-    window.location.reload()
+    setTradeAmount('')
+    setTargetProfit('')
+    setTargetLoss('')
+    setTradeError('')
+    await loadData(user.id)
   }
 
   const handleCloseSession = async () => {
@@ -337,6 +341,13 @@ export default function Dashboard() {
     }
     setWithdrawLoading(true)
     await supabase.from('withdrawals').insert({ user_id: user.id, amount: amt, address: withdrawAddress, status: 'pending' })
+    // Deduct balance immediately
+    await fetch('/api/wallet/deduct', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id, amount: amt }),
+    })
+    await loadData(user.id)
     setWithdrawLoading(false)
     setWithdrawDone(true)
   }
