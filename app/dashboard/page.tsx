@@ -8,7 +8,6 @@ import {
 } from 'recharts'
 import { supabase } from '@/lib/supabase'
 
-// ── Palette ─────────────────────────────────────────────────────
 const G = {
   gold: '#F5C518',
   goldDim: 'rgba(245,197,24,0.10)',
@@ -28,18 +27,16 @@ const G = {
   redText: '#f87171',
 }
 
-// ── Real network logos via CoinGecko CDN ─────────────────────────
 const COIN_LOGOS: Record<string, string> = {
   BTC:  'https://assets.coingecko.com/coins/images/1/thumb/bitcoin.png',
   USDT: 'https://assets.coingecko.com/coins/images/325/thumb/Tether-logo.png',
 }
 
-// ── Bot definitions ──────────────────────────────────────────────
 const BOTS = [
   {
     id: 'sprint',
     name: 'Sprint Bot',
-    icon: '\u26A1',
+    icon: '⚡',
     tag: '60 SEC',
     duration: 60,
     returnRate: 1.0,
@@ -55,7 +52,7 @@ const BOTS = [
   {
     id: 'titan',
     name: 'Titan Vault',
-    icon: '\uD83D\uDC51',
+    icon: '👑',
     tag: '20 MIN',
     duration: 1200,
     returnRate: 1.5,
@@ -70,7 +67,6 @@ const BOTS = [
   },
 ]
 
-// ── Ticker base ──────────────────────────────────────────────────
 const TICKERS_BASE = [
   { sym: 'BTC',   price: 83420,  change:  2.41 },
   { sym: 'ETH',   price: 3210,   change:  1.87 },
@@ -100,7 +96,6 @@ function fmtCountdown(sec: number) {
   return m > 0 ? `${m}:${String(s).padStart(2, '0')}` : `${s}s`
 }
 
-// ── CoinButton: currency selector with real logo ─────────────────
 function CoinButton({
   coin, label, selected, onClick,
 }: { coin: 'BTC' | 'USDT'; label: string; selected: boolean; onClick: () => void }) {
@@ -108,8 +103,8 @@ function CoinButton({
   return (
     <button onClick={onClick} style={{
       padding: '12px 16px', borderRadius: 12, width: '100%', cursor: 'pointer',
-      border: `1px solid ${selected ? accent + '66' : G.border}`,
-      background: selected ? accent + '12' : 'transparent',
+      border: `1px solid ${selected ? accent + '88' : G.border}`,
+      background: selected ? accent + '14' : 'transparent',
       display: 'flex', alignItems: 'center', gap: 12,
     }}>
       <img src={COIN_LOGOS[coin]} alt={coin} style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
@@ -122,13 +117,12 @@ function CoinButton({
         border: `2px solid ${selected ? accent : G.border}`,
         background: selected ? accent + '22' : 'transparent',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 10, color: accent,
-      }}>{selected ? '\u2713' : ''}</div>
+        fontSize: 11, color: accent, fontWeight: 700,
+      }}>{selected ? '✓' : ''}</div>
     </button>
   )
 }
 
-// ════════════════════════════════════════════════════════════════
 export default function Dashboard() {
   const router = useRouter()
 
@@ -140,16 +134,13 @@ export default function Dashboard() {
   const [loading,  setLoading]  = useState(true)
   const [isMobile, setIsMobile] = useState(false)
 
-  // Ticker
   const [tickers, setTickers] = useState(TICKERS_BASE)
 
-  // Deposit
   const [currency,       setCurrency]       = useState<'BTC' | 'USDT'>('USDT')
   const [depositAmount,  setDepositAmount]  = useState('')
   const [depositLoading, setDepositLoading] = useState(false)
   const [depositDone,    setDepositDone]    = useState(false)
 
-  // Trade (inline on home)
   const [selectedBot,  setSelectedBot]  = useState(BOTS[0])
   const [tradeAmount,  setTradeAmount]  = useState('')
   const [targetProfit, setTargetProfit] = useState('')
@@ -157,7 +148,6 @@ export default function Dashboard() {
   const [tradeLoading, setTradeLoading] = useState(false)
   const [tradeError,   setTradeError]   = useState('')
 
-  // Simulation
   const [simulatedPnl,  setSimulatedPnl]  = useState(0)
   const [pnlHistory,    setPnlHistory]    = useState<{ t: string; p: number }[]>([{ t: '0', p: 0 }])
   const [targetReached, setTargetReached] = useState(false)
@@ -166,7 +156,6 @@ export default function Dashboard() {
   const simRef   = useRef<NodeJS.Timeout | null>(null)
   const cdownRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Withdraw
   const [showWithdrawModal, setShowWithdrawModal] = useState(false)
   const [withdrawNetwork,   setWithdrawNetwork]   = useState<'BTC' | 'USDT'>('USDT')
   const [withdrawAmount,    setWithdrawAmount]     = useState('')
@@ -322,7 +311,7 @@ export default function Dashboard() {
     window.location.reload()
   }
 
-  const handleCloseSession = async (_keepTrading: boolean) => {
+  const handleCloseSession = async () => {
     if (!activeSession) return
     await fetch('/api/admin/stop-session', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -362,6 +351,9 @@ export default function Dashboard() {
     : 0
   const activeBotDef = BOTS.find(b => b.id === activeBotType) || BOTS[0]
 
+  // Can user actually start trading?
+  const canTrade = !activeSession && balance >= selectedBot.min
+
   if (loading) return (
     <div style={{ height: '100vh', background: G.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: G.gold, fontSize: 14 }}>
       Loading...
@@ -387,7 +379,7 @@ export default function Dashboard() {
               <span style={{ color: G.muted }}>{t.sym}/USDT</span>
               <span style={{ color: G.text }}>${t.price.toLocaleString(undefined, { minimumFractionDigits: t.price < 5 ? 4 : 2 })}</span>
               <span style={{ color: t.change >= 0 ? G.greenText : G.redText }}>
-                {t.change >= 0 ? '\u25b2' : '\u25bc'} {Math.abs(t.change).toFixed(2)}%
+                {t.change >= 0 ? '▲' : '▼'} {Math.abs(t.change).toFixed(2)}%
               </span>
             </span>
           ))}
@@ -399,16 +391,17 @@ export default function Dashboard() {
         {/* Desktop sidebar */}
         {!isMobile && (
           <aside style={{ width: 56, borderRight: `1px solid ${G.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 12, gap: 4, flexShrink: 0 }}>
-            <div style={{ width: 34, height: 34, background: G.goldDim, border: `1px solid ${G.goldBorder}`, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, marginBottom: 12 }}>\u26A1</div>
-            {([
-              { icon: '\u25a6', label: 'Dashboard', key: 'home'    },
-              { icon: '\u2191', label: 'Deposit',   key: 'deposit' },
-            ] as const).map(n => (
-              <div key={n.key} title={n.label} onClick={() => setView(n.key)}
-                style={{ width: 38, height: 38, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, cursor: 'pointer', background: view === n.key ? G.goldDim : 'transparent', color: view === n.key ? G.gold : G.muted, border: view === n.key ? `1px solid ${G.goldBorder}` : '1px solid transparent' }}>
-                {n.icon}
-              </div>
-            ))}
+            <div style={{ width: 34, height: 34, background: G.goldDim, border: `1px solid ${G.goldBorder}`, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, marginBottom: 12 }}>⚡</div>
+            {(['home', 'deposit'] as const).map((key) => {
+              const icons: Record<string, string> = { home: '▦', deposit: '↑' }
+              const labels: Record<string, string> = { home: 'Dashboard', deposit: 'Deposit' }
+              return (
+                <div key={key} title={labels[key]} onClick={() => setView(key)}
+                  style={{ width: 38, height: 38, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, cursor: 'pointer', background: view === key ? G.goldDim : 'transparent', color: view === key ? G.gold : G.muted, border: view === key ? `1px solid ${G.goldBorder}` : '1px solid transparent' }}>
+                  {icons[key]}
+                </div>
+              )
+            })}
             <div onClick={handleLogout} title="Logout"
               style={{ marginTop: 'auto', marginBottom: 16, width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: G.gold, cursor: 'pointer' }}>
               {user?.email?.[0]?.toUpperCase()}
@@ -421,7 +414,7 @@ export default function Dashboard() {
           {/* Topbar */}
           <div style={{ height: 44, borderBottom: `1px solid ${G.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              {isMobile && <div style={{ width: 28, height: 28, background: G.goldDim, border: `1px solid ${G.goldBorder}`, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>\u26A1</div>}
+              {isMobile && <div style={{ width: 28, height: 28, background: G.goldDim, border: `1px solid ${G.goldBorder}`, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>⚡</div>}
               <span style={{ fontSize: 13, fontWeight: 700, color: G.gold, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                 {view === 'home' ? 'Dashboard' : 'Deposit Funds'}
               </span>
@@ -430,7 +423,7 @@ export default function Dashboard() {
               {balance > 0 && view === 'home' && (
                 <button onClick={() => setShowWithdrawModal(true)}
                   style={{ padding: '5px 12px', borderRadius: 7, background: G.bg3, border: `1px solid ${G.border}`, color: G.text, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-                  \uD83D\uDCB8 {!isMobile && 'Withdraw'}
+                  💸 {!isMobile && 'Withdraw'}
                 </button>
               )}
               <div style={{ textAlign: 'right' }}>
@@ -440,7 +433,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Scrollable body */}
           <div style={{ flex: 1, overflow: 'auto', padding: isMobile ? '12px 12px 80px' : '20px' }}>
 
             {/* ═══ HOME ═══ */}
@@ -462,35 +454,35 @@ export default function Dashboard() {
                   ))}
                 </div>
 
-                {/* ── BOT CARDS (always on home, below stats) ── */}
+                {/* ── BOT CARDS — always visible, always selectable ── */}
                 <div>
-                  <div style={{ fontSize: 11, color: G.muted, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    Trading Bots
-                  </div>
+                  <div style={{ fontSize: 11, color: G.muted, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Trading Bots</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                     {BOTS.map(b => {
-                      const isSelected = selectedBot.id === b.id
+                      const isSelected = selectedBot.id === b.id && !activeSession
                       const isLive     = activeSession && activeBotType === b.id
-                      const isLocked   = balance < b.min
-                      const disabled   = !!activeSession || isLocked
-
+                      // Always allow selection — never disable bot cards
                       return (
-                        <div key={b.id} onClick={() => !disabled && setSelectedBot(b)}
+                        <div key={b.id}
+                          onClick={() => !activeSession && setSelectedBot(b)}
                           style={{
-                            padding: isMobile ? 16 : 20, borderRadius: 16,
-                            border: `2px solid ${isLive ? b.color : isSelected && !activeSession ? b.color : isLocked ? G.border : 'rgba(255,255,255,0.06)'}`,
-                            background: (isLive || (isSelected && !activeSession)) ? b.colorDim : G.bg3,
-                            cursor: disabled ? 'default' : 'pointer',
-                            opacity: isLocked && !activeSession ? 0.45 : 1,
-                            transition: 'all 0.2s', position: 'relative', overflow: 'hidden',
+                            padding: isMobile ? 16 : 20,
+                            borderRadius: 16,
+                            border: `2px solid ${isLive ? b.color : isSelected ? b.color : 'rgba(255,255,255,0.07)'}`,
+                            background: (isLive || isSelected) ? b.colorDim : G.bg3,
+                            cursor: activeSession ? 'default' : 'pointer',
+                            transition: 'all 0.2s',
+                            position: 'relative',
+                            overflow: 'hidden',
                           }}>
 
+                          {/* Badge top-right */}
                           <span style={{ position: 'absolute', top: 10, right: 10, fontSize: 8, padding: '2px 8px', borderRadius: 4, background: isLive ? 'rgba(74,222,128,0.15)' : b.colorDim, border: `1px solid ${isLive ? G.greenText : b.colorBorder}`, color: isLive ? G.greenText : b.color, fontWeight: 800, letterSpacing: '0.08em' }}>
-                            {isLive ? '\u25cf LIVE' : b.badge}
+                            {isLive ? '● LIVE' : b.badge}
                           </span>
 
                           <div style={{ fontSize: isMobile ? 26 : 30, marginBottom: 8 }}>{b.icon}</div>
-                          <div style={{ fontSize: 15, fontWeight: 800, color: (isSelected && !activeSession) || isLive ? b.color : G.text, marginBottom: 4 }}>{b.name}</div>
+                          <div style={{ fontSize: 15, fontWeight: 800, color: isSelected || isLive ? b.color : G.text, marginBottom: 4 }}>{b.name}</div>
                           <div style={{ fontSize: 11, color: G.muted, marginBottom: 14, lineHeight: 1.5 }}>{b.description}</div>
 
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
@@ -504,13 +496,8 @@ export default function Dashboard() {
                             </div>
                           </div>
 
-                          {((isSelected && !activeSession) || isLive) && (
+                          {(isSelected || isLive) && (
                             <div style={{ marginTop: 12, height: 2, background: `linear-gradient(90deg, ${b.color}, transparent)`, borderRadius: 1 }} />
-                          )}
-                          {isLocked && !activeSession && (
-                            <div style={{ marginTop: 8, fontSize: 10, color: G.redText }}>
-                              \uD83D\uDD12 Need ${b.min - Math.floor(balance)} more
-                            </div>
                           )}
                         </div>
                       )
@@ -518,24 +505,20 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* ── ACTIVE SESSION or TRADE FORM or CTA ── */}
-                {activeSession ? (
-
+                {/* ── ACTIVE SESSION ── */}
+                {activeSession && (
                   <div style={{ background: `linear-gradient(135deg, ${activeBotDef.colorDim} 0%, rgba(0,0,0,0) 60%)`, border: `1px solid ${targetReached ? G.greenText : activeBotDef.colorBorder}`, borderRadius: 16, padding: isMobile ? 16 : 24, position: 'relative', overflow: 'hidden', transition: 'border-color 0.5s', animation: 'fadeUp 0.3s ease' }}>
                     <div style={{ position: 'absolute', top: -80, right: -80, width: 240, height: 240, background: targetReached ? 'rgba(74,222,128,0.07)' : activeBotDef.colorDim, borderRadius: '50%', filter: 'blur(50px)', pointerEvents: 'none' }} />
 
-                    {/* Header */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                          <span style={{ fontSize: 16 }}>{activeBotDef.icon}</span>
+                          <span>{activeBotDef.icon}</span>
                           <span style={{ fontSize: 11, color: activeBotDef.color, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>{activeBotDef.name}</span>
                           <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 4, background: activeBotDef.colorDim, border: `1px solid ${activeBotDef.colorBorder}`, color: activeBotDef.color, fontWeight: 800 }}>{activeBotDef.tag}</span>
                         </div>
                         <div style={{ fontSize: isMobile ? 28 : 34, fontWeight: 900, letterSpacing: '-0.03em' }}>
-                          <span style={{ color: simulatedPnl >= 0 ? G.greenText : G.redText }}>
-                            {simulatedPnl >= 0 ? '+' : ''}${simulatedPnl.toFixed(2)}
-                          </span>
+                          <span style={{ color: simulatedPnl >= 0 ? G.greenText : G.redText }}>{simulatedPnl >= 0 ? '+' : ''}${simulatedPnl.toFixed(2)}</span>
                           <span style={{ fontSize: 12, color: G.muted, fontWeight: 400, marginLeft: 8 }}>P&L</span>
                         </div>
                       </div>
@@ -546,7 +529,7 @@ export default function Dashboard() {
                         </div>
                         {!targetReached && countdown > 0 && (
                           <div style={{ fontFamily: 'monospace', fontSize: 14, fontWeight: 800, color: activeBotDef.color, background: activeBotDef.colorDim, border: `1px solid ${activeBotDef.colorBorder}`, padding: '4px 12px', borderRadius: 7 }}>
-                            \u23F1 {fmtCountdown(countdown)}
+                            ⏱ {fmtCountdown(countdown)}
                           </div>
                         )}
                       </div>
@@ -580,7 +563,7 @@ export default function Dashboard() {
                       </ResponsiveContainer>
                     </div>
 
-                    {/* Progress */}
+                    {/* Progress bar */}
                     <div style={{ marginBottom: 14 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                         <span style={{ fontSize: 11, color: G.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Progress to Target</span>
@@ -595,7 +578,6 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    {/* Stats row */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
                       {[
                         { label: 'Traded',     value: `$${activeSession.amount}`,                                                     color: G.text },
@@ -611,82 +593,90 @@ export default function Dashboard() {
 
                     {targetReached && (
                       <div style={{ marginTop: 14, padding: 18, background: 'linear-gradient(135deg,rgba(22,163,74,0.15),rgba(74,222,128,0.08))', border: `1px solid ${G.greenText}`, borderRadius: 12, boxShadow: '0 0 30px rgba(74,222,128,0.12)', animation: 'fadeUp 0.4s ease' }}>
-                        <div style={{ fontSize: 18, fontWeight: 900, color: G.greenText, marginBottom: 6 }}>\uD83C\uDFAF Target Reached!</div>
+                        <div style={{ fontSize: 18, fontWeight: 900, color: G.greenText, marginBottom: 6 }}>🎯 Target Reached!</div>
                         <div style={{ fontSize: 13, color: G.text, marginBottom: 14, lineHeight: 1.6 }}>
                           Profit: <span style={{ color: G.greenText, fontWeight: 700 }}>+${simulatedPnl.toFixed(2)}</span> · Total credit:{' '}
                           <span style={{ color: G.gold, fontWeight: 700 }}>${(activeSession.amount + simulatedPnl).toFixed(2)}</span>
                         </div>
                         <div style={{ display: 'flex', gap: 10 }}>
-                          <button onClick={() => handleCloseSession(false)}
+                          <button onClick={handleCloseSession}
                             style={{ flex: 1, padding: 13, borderRadius: 10, background: 'rgba(22,163,74,0.2)', border: `1px solid ${G.greenText}`, color: G.greenText, fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
-                            \u2705 Collect & Close
+                            ✅ Collect & Close
                           </button>
-                          <button onClick={() => handleCloseSession(true)}
+                          <button onClick={handleCloseSession}
                             style={{ flex: 1, padding: 13, borderRadius: 10, background: G.goldDim, border: `1px solid ${G.goldBorder}`, color: G.gold, fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
-                            \uD83D\uDD04 Trade Again
+                            🔄 Trade Again
                           </button>
                         </div>
                       </div>
                     )}
                   </div>
+                )}
 
-                ) : balance >= selectedBot.min ? (
-
-                  /* INLINE TRADE FORM */
+                {/* ── CONFIGURE TRADE FORM — always shown when no active session ── */}
+                {!activeSession && (
                   <div style={{ background: G.bg2, border: `1px solid ${G.border}`, borderRadius: 16, padding: isMobile ? 18 : 24, display: 'flex', flexDirection: 'column', gap: 16, animation: 'fadeUp 0.3s ease' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                       <div>
                         <div style={{ fontSize: 16, fontWeight: 700 }}>Configure Trade</div>
                         <div style={{ fontSize: 12, color: G.muted, marginTop: 2 }}>
                           <span style={{ color: selectedBot.color, fontWeight: 700 }}>{selectedBot.icon} {selectedBot.name}</span>
-                          {' '}&middot; {selectedBot.tag} &middot; <span style={{ color: G.greenText }}>+{selectedBot.returnRate * 100}%</span> return
+                          {' · '}{selectedBot.tag}{' · '}
+                          <span style={{ color: G.greenText }}>+{selectedBot.returnRate * 100}% return</span>
                         </div>
                       </div>
                       <div style={{ fontSize: 12, color: G.muted }}>
-                        Available: <span style={{ color: G.gold, fontWeight: 700 }}>${balance.toFixed(2)}</span>
+                        Available: <span style={{ color: balance > 0 ? G.gold : G.redText, fontWeight: 700 }}>${balance.toFixed(2)}</span>
                       </div>
                     </div>
 
+                    {/* Amount input */}
                     <div>
                       <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>Trade Amount (USD)</div>
                       <input
                         type="number"
-                        placeholder={`$${selectedBot.min}${selectedBot.max < 9_999_999 ? ' \u2013 $' + selectedBot.max : '+'}`}
+                        placeholder={`Min $${selectedBot.min}${selectedBot.max < 9_999_999 ? ' – Max $' + selectedBot.max : ''}`}
                         value={tradeAmount}
                         onChange={e => setTradeAmount(e.target.value)}
-                        style={{ width: '100%', background: G.bg3, border: `1px solid ${G.border}`, borderRadius: 10, padding: '14px 16px', fontSize: 16, color: G.text, outline: 'none' }}
+                        disabled={!canTrade}
+                        style={{ width: '100%', background: canTrade ? G.bg3 : 'rgba(255,255,255,0.02)', border: `1px solid ${G.border}`, borderRadius: 10, padding: '14px 16px', fontSize: 16, color: canTrade ? G.text : G.muted, outline: 'none', cursor: canTrade ? 'text' : 'not-allowed' }}
                       />
+                      {/* Quick picks */}
                       <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                         {[50, 100, 200, 500, 1000]
-                          .filter(v => v >= selectedBot.min && v <= balance)
+                          .filter(v => v >= selectedBot.min)
                           .map(v => (
-                            <button key={v} onClick={() => setTradeAmount(String(v))}
-                              style={{ padding: '6px 14px', borderRadius: 7, background: parseFloat(tradeAmount) === v ? selectedBot.colorDim : G.bg3, border: `1px solid ${parseFloat(tradeAmount) === v ? selectedBot.colorBorder : G.border}`, color: parseFloat(tradeAmount) === v ? selectedBot.color : G.muted, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                            <button key={v}
+                              onClick={() => canTrade && setTradeAmount(String(v))}
+                              disabled={!canTrade || v > balance}
+                              style={{ padding: '6px 14px', borderRadius: 7, background: parseFloat(tradeAmount) === v ? selectedBot.colorDim : G.bg3, border: `1px solid ${parseFloat(tradeAmount) === v ? selectedBot.colorBorder : G.border}`, color: parseFloat(tradeAmount) === v ? selectedBot.color : (v > balance ? G.muted + '55' : G.muted), fontSize: 12, fontWeight: 700, cursor: canTrade && v <= balance ? 'pointer' : 'not-allowed', opacity: v > balance ? 0.4 : 1 }}>
                               ${v}
                             </button>
                           ))}
-                        {balance >= selectedBot.min && (
-                          <button onClick={() => setTradeAmount(String(Math.min(Math.floor(balance), selectedBot.max)))}
-                            style={{ padding: '6px 14px', borderRadius: 7, background: G.bg3, border: `1px solid ${G.border}`, color: G.muted, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-                            MAX
-                          </button>
-                        )}
+                        <button
+                          onClick={() => canTrade && setTradeAmount(String(Math.min(Math.floor(balance), selectedBot.max)))}
+                          disabled={!canTrade}
+                          style={{ padding: '6px 14px', borderRadius: 7, background: G.bg3, border: `1px solid ${G.border}`, color: G.muted, fontSize: 12, fontWeight: 700, cursor: canTrade ? 'pointer' : 'not-allowed', opacity: canTrade ? 1 : 0.4 }}>
+                          MAX
+                        </button>
                       </div>
                     </div>
 
-                    {tradeAmount && parseFloat(tradeAmount) >= selectedBot.min && (
+                    {/* Projected profit */}
+                    {tradeAmount && parseFloat(tradeAmount) >= selectedBot.min && canTrade && (
                       <div style={{ padding: 14, background: selectedBot.colorDim, border: `1px solid ${selectedBot.colorBorder}`, borderRadius: 12 }}>
                         <div style={{ fontSize: 11, color: G.muted, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Projected Profit</div>
                         <div style={{ fontSize: 26, fontWeight: 900, color: selectedBot.color }}>
                           +${(parseFloat(tradeAmount) * selectedBot.returnRate).toFixed(2)}
                         </div>
                         <div style={{ fontSize: 11, color: G.muted, marginTop: 4 }}>
-                          in ~{selectedBot.tag} &middot; Total credit:{' '}
+                          in ~{selectedBot.tag} · Total credit:{' '}
                           <span style={{ color: G.text, fontWeight: 600 }}>${(parseFloat(tradeAmount) * (1 + selectedBot.returnRate)).toFixed(2)}</span>
                         </div>
                       </div>
                     )}
 
+                    {/* Stop loss */}
                     <div>
                       <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>Stop Loss at ($)</div>
                       <input
@@ -694,7 +684,8 @@ export default function Dashboard() {
                         placeholder="e.g. 50"
                         value={targetLoss}
                         onChange={e => setTargetLoss(e.target.value)}
-                        style={{ width: '100%', background: G.bg3, border: `1px solid ${G.border}`, borderRadius: 10, padding: '14px 16px', fontSize: 15, color: G.redText, outline: 'none' }}
+                        disabled={!canTrade}
+                        style={{ width: '100%', background: canTrade ? G.bg3 : 'rgba(255,255,255,0.02)', border: `1px solid ${G.border}`, borderRadius: 10, padding: '14px 16px', fontSize: 15, color: canTrade ? G.redText : G.muted, outline: 'none', cursor: canTrade ? 'text' : 'not-allowed' }}
                       />
                     </div>
 
@@ -702,26 +693,32 @@ export default function Dashboard() {
                       <div style={{ fontSize: 12, color: G.redText, padding: '10px 14px', background: G.redBg, borderRadius: 8 }}>{tradeError}</div>
                     )}
 
-                    <button onClick={handleTrade} disabled={tradeLoading}
-                      style={{ background: selectedBot.color, color: '#000', fontWeight: 900, fontSize: 15, padding: 17, borderRadius: 12, border: 'none', cursor: 'pointer', opacity: tradeLoading ? 0.6 : 1, letterSpacing: '0.02em' }}>
-                      {tradeLoading ? 'Starting...' : `\u25b6 Start ${selectedBot.name}`}
-                    </button>
-                  </div>
-
-                ) : (
-
-                  /* DEPOSIT CTA */
-                  <div style={{ background: G.bg2, border: `1px solid ${G.border}`, borderRadius: 12, padding: 24, textAlign: 'center' }}>
-                    <div style={{ fontSize: 32, marginBottom: 8 }}>\uD83D\uDCB0</div>
-                    <div style={{ fontSize: 14, color: G.muted, marginBottom: 14 }}>
-                      {balance === 0
-                        ? 'Deposit funds to start trading'
-                        : `Need $${selectedBot.min - Math.floor(balance)} more for ${selectedBot.name}`}
-                    </div>
-                    <button onClick={() => setView('deposit')}
-                      style={{ background: G.gold, color: '#000', fontWeight: 700, fontSize: 13, padding: '11px 32px', borderRadius: 9, border: 'none', cursor: 'pointer' }}>
-                      \u2191 Deposit Now
-                    </button>
+                    {/* ── START BUTTON — gated on balance ── */}
+                    {canTrade ? (
+                      <button onClick={handleTrade} disabled={tradeLoading}
+                        style={{ background: selectedBot.color, color: '#000', fontWeight: 900, fontSize: 15, padding: 17, borderRadius: 12, border: 'none', cursor: 'pointer', opacity: tradeLoading ? 0.6 : 1, letterSpacing: '0.02em' }}>
+                        {tradeLoading ? 'Starting...' : `▶ Start ${selectedBot.name}`}
+                      </button>
+                    ) : (
+                      /* Not enough balance — show deposit CTA instead */
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        <div style={{ padding: '14px 16px', background: 'rgba(245,197,24,0.06)', border: `1px solid ${G.goldBorder}`, borderRadius: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <span style={{ fontSize: 22 }}>🔒</span>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: G.gold }}>
+                              {balance === 0 ? 'Fund your account to trade' : `Need $${(selectedBot.min - balance).toFixed(2)} more to run ${selectedBot.name}`}
+                            </div>
+                            <div style={{ fontSize: 11, color: G.muted, marginTop: 2 }}>
+                              Minimum deposit $85 · Min trade ${selectedBot.min}
+                            </div>
+                          </div>
+                        </div>
+                        <button onClick={() => setView('deposit')}
+                          style={{ background: G.gold, color: '#000', fontWeight: 900, fontSize: 15, padding: 17, borderRadius: 12, border: 'none', cursor: 'pointer', letterSpacing: '0.02em' }}>
+                          ↑ Deposit to Activate Bot
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -763,9 +760,7 @@ export default function Dashboard() {
                               <td style={{ padding: '8px 0', color: G.sec }}>{new Date(d.created_at).toLocaleDateString()}</td>
                               <td style={{ padding: '8px 0' }}>
                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                                  {COIN_LOGOS[d.currency] && (
-                                    <img src={COIN_LOGOS[d.currency]} alt={d.currency} style={{ width: 18, height: 18, borderRadius: '50%' }} />
-                                  )}
+                                  {COIN_LOGOS[d.currency] && <img src={COIN_LOGOS[d.currency]} alt={d.currency} style={{ width: 18, height: 18, borderRadius: '50%' }} />}
                                   <span style={{ fontWeight: 600 }}>{d.currency}</span>
                                 </span>
                               </td>
@@ -792,18 +787,17 @@ export default function Dashboard() {
                 <div style={{ background: G.bg2, border: `1px solid ${G.border}`, borderRadius: 16, padding: isMobile ? 20 : 28, display: 'flex', flexDirection: 'column', gap: 20 }}>
                   <div>
                     <div style={{ fontSize: 18, fontWeight: 700 }}>Fund Your Wallet</div>
-                    <div style={{ fontSize: 13, color: G.muted, marginTop: 4 }}>Minimum deposit: $85 &middot; Fee: $1</div>
+                    <div style={{ fontSize: 13, color: G.muted, marginTop: 4 }}>Minimum deposit: $85 · Fee: $1</div>
                   </div>
                   {!depositDone ? (
                     <>
                       <div>
                         <div style={{ fontSize: 11, color: G.muted, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Select Network</div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          <CoinButton coin="USDT" label="Tether \u00b7 TRC20 Network" selected={currency === 'USDT'} onClick={() => setCurrency('USDT')} />
-                          <CoinButton coin="BTC"  label="Bitcoin \u00b7 Mainnet"       selected={currency === 'BTC'}  onClick={() => setCurrency('BTC')}  />
+                          <CoinButton coin="USDT" label="Tether · TRC20 Network" selected={currency === 'USDT'} onClick={() => setCurrency('USDT')} />
+                          <CoinButton coin="BTC"  label="Bitcoin · Mainnet"      selected={currency === 'BTC'}  onClick={() => setCurrency('BTC')}  />
                         </div>
                       </div>
-
                       <div>
                         <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>
                           Send <span style={{ color: G.text, fontWeight: 700 }}>{currency === 'USDT' ? 'USDT (TRC20)' : 'Bitcoin'}</span> to this address
@@ -812,12 +806,9 @@ export default function Dashboard() {
                           {WALLET_ADDRESSES[currency]}
                         </div>
                         <div style={{ fontSize: 11, color: G.muted, marginTop: 6 }}>
-                          {currency === 'USDT'
-                            ? '\u26A0 Only send USDT on the TRC20 (Tron) network \u2014 do not use ERC20'
-                            : '\u26A0 Bitcoin mainnet only \u2014 do not send from other chains'}
+                          {currency === 'USDT' ? '⚠ Only send USDT on TRC20 (Tron) — not ERC20' : '⚠ Bitcoin mainnet only'}
                         </div>
                       </div>
-
                       <div>
                         <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>Amount (USD equivalent)</div>
                         <input type="number" placeholder="Min. $85" value={depositAmount} onChange={e => setDepositAmount(e.target.value)}
@@ -828,17 +819,16 @@ export default function Dashboard() {
                           </div>
                         )}
                       </div>
-
                       <button onClick={handleDeposit} disabled={depositLoading}
                         style={{ background: G.gold, color: '#000', fontWeight: 800, fontSize: 15, padding: 16, borderRadius: 12, border: 'none', cursor: 'pointer', opacity: depositLoading ? 0.6 : 1 }}>
-                        {depositLoading ? 'Submitting...' : 'I Have Sent the Funds \u2192'}
+                        {depositLoading ? 'Submitting...' : 'I Have Sent the Funds →'}
                       </button>
                     </>
                   ) : (
                     <div style={{ textAlign: 'center', padding: 20 }}>
-                      <div style={{ fontSize: 40, marginBottom: 12 }}>\u2705</div>
+                      <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
                       <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Request Submitted</div>
-                      <div style={{ fontSize: 13, color: G.muted, marginBottom: 20 }}>Balance updates in 10\u201330 min after confirmation.</div>
+                      <div style={{ fontSize: 13, color: G.muted, marginBottom: 20 }}>Balance updates in 10–30 min after confirmation.</div>
                       <button onClick={() => { setView('home'); setDepositDone(false); setDepositAmount('') }}
                         style={{ background: G.goldDim, color: G.gold, border: `1px solid ${G.goldBorder}`, fontWeight: 700, fontSize: 13, padding: '12px 28px', borderRadius: 10, cursor: 'pointer' }}>
                         Back to Dashboard
@@ -856,9 +846,9 @@ export default function Dashboard() {
       {isMobile && (
         <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: 62, background: 'rgba(8,8,8,0.97)', borderTop: `1px solid ${G.border}`, backdropFilter: 'blur(16px)', display: 'flex', alignItems: 'center', zIndex: 50 }}>
           {([
-            { icon: '\u25a6', label: 'Home',    action: () => setView('home') },
-            { icon: '\u2191', label: 'Deposit', action: () => setView('deposit') },
-            { icon: '\u25ce', label: 'Trade',   action: () => setView('home') },
+            { icon: '▦', label: 'Home',    action: () => setView('home') },
+            { icon: '↑', label: 'Deposit', action: () => setView('deposit') },
+            { icon: '◎', label: 'Trade',   action: () => setView('home') },
           ] as const).map(n => {
             const active = n.label === 'Home' ? view === 'home' : n.label === 'Deposit' ? view === 'deposit' : false
             return (
@@ -884,29 +874,26 @@ export default function Dashboard() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ fontSize: 18, fontWeight: 800 }}>Withdraw Funds</div>
               <button onClick={() => { setShowWithdrawModal(false); setWithdrawDone(false); setWithdrawAmount(''); setWithdrawAddress(''); setAddressError('') }}
-                style={{ background: 'transparent', border: 'none', color: G.muted, cursor: 'pointer', fontSize: 20 }}>\u2715</button>
+                style={{ background: 'transparent', border: 'none', color: G.muted, cursor: 'pointer', fontSize: 20 }}>✕</button>
             </div>
             {!withdrawDone ? (
               <>
                 <div style={{ fontSize: 13, color: G.muted }}>Balance: <span style={{ color: G.gold, fontWeight: 800, fontSize: 15 }}>${balance.toFixed(2)}</span></div>
-
                 <div>
                   <div style={{ fontSize: 11, color: G.muted, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Withdrawal Network</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <CoinButton coin="USDT" label="Tether \u00b7 TRC20 Network" selected={withdrawNetwork === 'USDT'} onClick={() => { setWithdrawNetwork('USDT'); setWithdrawAddress(''); setAddressError('') }} />
-                    <CoinButton coin="BTC"  label="Bitcoin \u00b7 Mainnet"       selected={withdrawNetwork === 'BTC'}  onClick={() => { setWithdrawNetwork('BTC');  setWithdrawAddress(''); setAddressError('') }} />
+                    <CoinButton coin="USDT" label="Tether · TRC20 Network" selected={withdrawNetwork === 'USDT'} onClick={() => { setWithdrawNetwork('USDT'); setWithdrawAddress(''); setAddressError('') }} />
+                    <CoinButton coin="BTC"  label="Bitcoin · Mainnet"      selected={withdrawNetwork === 'BTC'}  onClick={() => { setWithdrawNetwork('BTC');  setWithdrawAddress(''); setAddressError('') }} />
                   </div>
                   <div style={{ fontSize: 11, color: G.sec, marginTop: 8 }}>
-                    {withdrawNetwork === 'USDT' ? '\u26A0 TRC20 (Tron) only \u2014 do not use ERC20' : '\u26A0 Bitcoin mainnet only'}
+                    {withdrawNetwork === 'USDT' ? '⚠ TRC20 (Tron) only — do not use ERC20' : '⚠ Bitcoin mainnet only'}
                   </div>
                 </div>
-
                 <div>
                   <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>Amount (USD)</div>
                   <input type="number" placeholder="Min. $10" value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)}
                     style={{ width: '100%', background: G.bg3, border: `1px solid ${G.border}`, borderRadius: 10, padding: '14px 16px', fontSize: 15, color: G.text, outline: 'none' }} />
                 </div>
-
                 <div>
                   <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>Your {withdrawNetwork === 'USDT' ? 'USDT TRC20' : 'Bitcoin'} Address</div>
                   <input type="text"
@@ -914,21 +901,20 @@ export default function Dashboard() {
                     value={withdrawAddress}
                     onChange={e => { setWithdrawAddress(e.target.value); setAddressError('') }}
                     style={{ width: '100%', background: G.bg3, border: `1px solid ${addressError ? G.red : G.border}`, borderRadius: 10, padding: '14px 16px', fontSize: 12, color: G.text, outline: 'none', fontFamily: 'monospace' }} />
-                  {addressError && <div style={{ fontSize: 11, color: G.redText, marginTop: 6 }}>\u26A0 {addressError}</div>}
+                  {addressError && <div style={{ fontSize: 11, color: G.redText, marginTop: 6 }}>⚠ {addressError}</div>}
                   {withdrawAddress && !addressError && validateAddress(withdrawAddress, withdrawNetwork) && (
-                    <div style={{ fontSize: 11, color: G.greenText, marginTop: 6 }}>\u2713 Valid {withdrawNetwork} address</div>
+                    <div style={{ fontSize: 11, color: G.greenText, marginTop: 6 }}>✓ Valid {withdrawNetwork} address</div>
                   )}
                 </div>
-
                 <button onClick={handleWithdraw} disabled={withdrawLoading}
                   style={{ background: G.gold, color: '#000', fontWeight: 800, fontSize: 15, padding: 16, borderRadius: 12, border: 'none', cursor: 'pointer', opacity: withdrawLoading ? 0.6 : 1 }}>
-                  {withdrawLoading ? 'Submitting...' : 'Request Withdrawal \u2192'}
+                  {withdrawLoading ? 'Submitting...' : 'Request Withdrawal →'}
                 </button>
-                <div style={{ fontSize: 11, color: G.muted, textAlign: 'center' }}>Processed within 24 hours &middot; Minimum $10</div>
+                <div style={{ fontSize: 11, color: G.muted, textAlign: 'center' }}>Processed within 24 hours · Minimum $10</div>
               </>
             ) : (
               <div style={{ textAlign: 'center', padding: 20 }}>
-                <div style={{ fontSize: 40, marginBottom: 12 }}>\u2705</div>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
                 <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>Withdrawal Requested</div>
                 <div style={{ fontSize: 13, color: G.muted, marginBottom: 20 }}>Processed within 24h to your {withdrawNetwork} address.</div>
                 <button onClick={() => { setShowWithdrawModal(false); setWithdrawDone(false); setWithdrawAmount(''); setWithdrawAddress('') }}
