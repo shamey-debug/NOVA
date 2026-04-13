@@ -72,6 +72,13 @@ export default function Dashboard() {
   const [pnlHistory, setPnlHistory] = useState<{ t: string; p: number }[]>([{ t: '0', p: 0 }])
   const simulationRef = useRef<NodeJS.Timeout | null>(null)
 
+  // Withdrawal modal
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false)
+  const [withdrawAmount, setWithdrawAmount] = useState('')
+  const [withdrawAddress, setWithdrawAddress] = useState('')
+  const [withdrawLoading, setWithdrawLoading] = useState(false)
+  const [withdrawDone, setWithdrawDone] = useState(false)
+
   useEffect(() => {
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -151,6 +158,37 @@ export default function Dashboard() {
     window.location.reload()
   }
 
+  const handleCloseSession = async (keepTrading: boolean) => {
+    if (!activeSession) return
+    await fetch('/api/admin/stop-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: activeSession.id }),
+    })
+    await fetch('/api/wallet/credit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id, amount: activeSession.amount + simulatedPnl }),
+    })
+    window.location.reload()
+  }
+
+  const handleWithdraw = async () => {
+    if (!withdrawAmount || !withdrawAddress) return
+    const amt = parseFloat(withdrawAmount)
+    if (amt < 10) { alert('Minimum withdrawal is $10'); return }
+    if (amt > balance) { alert('Insufficient balance'); return }
+    setWithdrawLoading(true)
+    await supabase.from('withdrawals').insert({
+      user_id: user.id,
+      amount: amt,
+      address: withdrawAddress,
+      status: 'pending',
+    })
+    setWithdrawLoading(false)
+    setWithdrawDone(true)
+  }
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
@@ -192,9 +230,17 @@ export default function Dashboard() {
           <span style={{ fontSize: 13, fontWeight: 700, color: G.gold, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
             {view === 'home' ? 'Dashboard' : view === 'deposit' ? 'Deposit Funds' : 'Activate Bot'}
           </span>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 10, color: G.muted }}>Wallet Balance</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: G.gold }}>${balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {balance > 0 && view === 'home' && (
+              <button onClick={() => setShowWithdrawModal(true)}
+                style={{ padding: '6px 14px', borderRadius: 7, background: G.bg3, border: `1px solid ${G.border}`, color: G.text, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                💸 Withdraw
+              </button>
+            )}
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 10, color: G.muted }}>Wallet Balance</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: G.gold }}>${balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+            </div>
           </div>
         </div>
 
@@ -243,7 +289,6 @@ export default function Dashboard() {
               {activeSession ? (
                 <div style={{ background: G.bg2, border: `1px solid ${G.goldBorder}`, borderRadius: 12, padding: 20 }}>
 
-                  {/* Header */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                     <div style={{ fontSize: 11, color: G.gold, textTransform: 'uppercase', letterSpacing: '0.06em' }}>● Active Bot Session</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -252,7 +297,6 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Stats */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 16 }}>
                     {[
                       { label: 'Amount', value: `$${activeSession.amount}`, color: G.text },
@@ -267,7 +311,6 @@ export default function Dashboard() {
                     ))}
                   </div>
 
-                  {/* Progress bar */}
                   <div style={{ marginBottom: 16 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                       <span style={{ fontSize: 11, color: G.muted }}>Progress to target</span>
@@ -280,7 +323,6 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Live P&L chart */}
                   <ResponsiveContainer width="100%" height={120}>
                     <AreaChart data={pnlHistory}>
                       <defs>
@@ -296,10 +338,23 @@ export default function Dashboard() {
                     </AreaChart>
                   </ResponsiveContainer>
 
-                  {/* Target reached */}
                   {simulatedPnl >= activeSession.target_profit && (
-                    <div style={{ marginTop: 12, padding: '10px 16px', background: G.greenBg, border: `1px solid ${G.green}`, borderRadius: 8, textAlign: 'center' }}>
-                      <span style={{ color: G.greenText, fontWeight: 700, fontSize: 13 }}>🎯 Target reached! +${activeSession.target_profit} profit</span>
+                    <div style={{ marginTop: 12, padding: 20, background: G.greenBg, border: `1px solid ${G.green}`, borderRadius: 12 }}>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: G.greenText, marginBottom: 8 }}>🎯 Target Reached!</div>
+                      <div style={{ fontSize: 13, color: G.text, marginBottom: 16 }}>
+                        Your bot made <span style={{ color: G.greenText, fontWeight: 700 }}>+${simulatedPnl.toFixed(2)}</span> profit on a <span style={{ fontWeight: 700 }}>${activeSession.amount}</span> trade.{' '}
+                        Total to credit: <span style={{ color: G.gold, fontWeight: 700 }}>${(activeSession.amount + simulatedPnl).toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        <button onClick={() => handleCloseSession(false)}
+                          style={{ flex: 1, padding: 11, borderRadius: 8, background: G.greenBg, border: `1px solid ${G.green}`, color: G.greenText, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                          ✅ Close & Collect
+                        </button>
+                        <button onClick={() => handleCloseSession(true)}
+                          style={{ flex: 1, padding: 11, borderRadius: 8, background: G.goldDim, border: `1px solid ${G.goldBorder}`, color: G.gold, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                          🔄 Trade Again
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -354,7 +409,6 @@ export default function Dashboard() {
                   <div style={{ fontSize: 18, fontWeight: 700 }}>Fund Your Wallet</div>
                   <div style={{ fontSize: 13, color: G.muted, marginTop: 4 }}>Minimum deposit: $85 · Fee: $1</div>
                 </div>
-
                 {!depositDone ? (
                   <>
                     <div>
@@ -368,7 +422,6 @@ export default function Dashboard() {
                         ))}
                       </div>
                     </div>
-
                     <div>
                       <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>Send {currency} to this address</div>
                       <div style={{ background: G.bg3, border: `1px solid ${G.border}`, borderRadius: 8, padding: '12px 16px', fontSize: 12, color: G.gold, wordBreak: 'break-all', letterSpacing: '0.02em' }}>
@@ -376,7 +429,6 @@ export default function Dashboard() {
                       </div>
                       <div style={{ fontSize: 11, color: G.muted, marginTop: 6 }}>⚠ Only send {currency} to this address</div>
                     </div>
-
                     <div>
                       <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>Amount (USD equivalent)</div>
                       <input type="number" placeholder="Min. $85" value={depositAmount} onChange={e => setDepositAmount(e.target.value)}
@@ -387,7 +439,6 @@ export default function Dashboard() {
                         </div>
                       )}
                     </div>
-
                     <button onClick={handleDeposit} disabled={depositLoading}
                       style={{ background: G.gold, color: '#000', fontWeight: 800, fontSize: 14, padding: 14, borderRadius: 10, border: 'none', cursor: 'pointer', opacity: depositLoading ? 0.6 : 1 }}>
                       {depositLoading ? 'Submitting...' : 'I Have Sent the Funds →'}
@@ -416,7 +467,6 @@ export default function Dashboard() {
                   <div style={{ fontSize: 18, fontWeight: 700 }}>Activate Trading Bot</div>
                   <div style={{ fontSize: 13, color: G.muted, marginTop: 4 }}>Available: <span style={{ color: G.gold }}>${balance.toFixed(2)}</span></div>
                 </div>
-
                 {balance < 85 ? (
                   <div style={{ textAlign: 'center', padding: 20 }}>
                     <div style={{ fontSize: 13, color: G.muted, marginBottom: 16 }}>You need at least $85 in your wallet to start trading.</div>
@@ -445,13 +495,11 @@ export default function Dashboard() {
                         ))}
                       </div>
                     </div>
-
                     <div>
                       <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>Trade Amount (USD)</div>
                       <input type="number" placeholder={`Min. $${selectedBot.min}`} value={tradeAmount} onChange={e => setTradeAmount(e.target.value)}
                         style={{ width: '100%', background: G.bg3, border: `1px solid ${G.border}`, borderRadius: 8, padding: '12px 16px', fontSize: 13, color: G.text, outline: 'none', boxSizing: 'border-box' }} />
                     </div>
-
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                       <div>
                         <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>Take Profit at ($)</div>
@@ -464,9 +512,7 @@ export default function Dashboard() {
                           style={{ width: '100%', background: G.bg3, border: `1px solid ${G.border}`, borderRadius: 8, padding: '12px 16px', fontSize: 13, color: G.redText, outline: 'none', boxSizing: 'border-box' }} />
                       </div>
                     </div>
-
                     {tradeError && <div style={{ fontSize: 12, color: G.redText }}>{tradeError}</div>}
-
                     <button onClick={handleTrade} disabled={tradeLoading}
                       style={{ background: G.gold, color: '#000', fontWeight: 800, fontSize: 14, padding: 14, borderRadius: 10, border: 'none', cursor: 'pointer', opacity: tradeLoading ? 0.6 : 1 }}>
                       {tradeLoading ? 'Starting...' : '▶ Start Trading'}
@@ -478,6 +524,49 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* Withdraw Modal */}
+      {showWithdrawModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
+          <div style={{ background: '#111', border: `1px solid ${G.border}`, borderRadius: 16, padding: 28, width: 420, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>Withdraw Funds</div>
+              <button onClick={() => { setShowWithdrawModal(false); setWithdrawDone(false); setWithdrawAmount(''); setWithdrawAddress('') }}
+                style={{ background: 'transparent', border: 'none', color: G.muted, cursor: 'pointer', fontSize: 18 }}>✕</button>
+            </div>
+            {!withdrawDone ? (
+              <>
+                <div style={{ fontSize: 13, color: G.muted }}>Available: <span style={{ color: G.gold, fontWeight: 700 }}>${balance.toFixed(2)}</span></div>
+                <div>
+                  <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>Amount (USD)</div>
+                  <input type="number" placeholder="Min. $10" value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)}
+                    style={{ width: '100%', background: G.bg3, border: `1px solid ${G.border}`, borderRadius: 8, padding: '12px 16px', fontSize: 13, color: G.text, outline: 'none', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>Your BTC or USDT (TRC20) Address</div>
+                  <input type="text" placeholder="Paste your wallet address" value={withdrawAddress} onChange={e => setWithdrawAddress(e.target.value)}
+                    style={{ width: '100%', background: G.bg3, border: `1px solid ${G.border}`, borderRadius: 8, padding: '12px 16px', fontSize: 13, color: G.text, outline: 'none', boxSizing: 'border-box' }} />
+                </div>
+                <button onClick={handleWithdraw} disabled={withdrawLoading}
+                  style={{ background: G.gold, color: '#000', fontWeight: 800, fontSize: 14, padding: 14, borderRadius: 10, border: 'none', cursor: 'pointer', opacity: withdrawLoading ? 0.6 : 1 }}>
+                  {withdrawLoading ? 'Submitting...' : 'Request Withdrawal →'}
+                </button>
+                <div style={{ fontSize: 11, color: G.muted, textAlign: 'center' }}>Withdrawals are processed within 24 hours</div>
+              </>
+            ) : (
+              <div style={{ textAlign: 'center', padding: 20 }}>
+                <div style={{ fontSize: 32, marginBottom: 12 }}>✅</div>
+                <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Withdrawal Requested</div>
+                <div style={{ fontSize: 13, color: G.muted, marginBottom: 20 }}>We will process your withdrawal within 24 hours.</div>
+                <button onClick={() => { setShowWithdrawModal(false); setWithdrawDone(false); setWithdrawAmount(''); setWithdrawAddress('') }}
+                  style={{ background: G.goldDim, color: G.gold, border: `1px solid ${G.goldBorder}`, fontWeight: 700, fontSize: 13, padding: '10px 24px', borderRadius: 8, cursor: 'pointer' }}>
+                  Done
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
