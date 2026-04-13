@@ -36,21 +36,16 @@ export default function AdminPage() {
 
   useEffect(() => {
     const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) { router.push('/login'); return }
 
-      // Check admin role
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
+  const res = await fetch('/api/admin/me')
+  const { role } = await res.json()
+  if (role !== 'admin') { router.push('/dashboard'); return }
 
-      if (profile?.role !== 'admin') { router.push('/dashboard'); return }
-
-      await fetchAll()
-      setLoading(false)
-    }
+  await fetchAll()
+  setLoading(false)
+}
     init()
   }, [])
 
