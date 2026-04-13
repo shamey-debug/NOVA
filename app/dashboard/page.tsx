@@ -1,27 +1,27 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { supabase } from '@/lib/supabase'
 
 const G = {
-  gold: "#F5C518",
-  goldDim: "rgba(245,197,24,0.10)",
-  goldBorder: "rgba(245,197,24,0.20)",
-  bg: "#070707",
-  bg2: "rgba(255,255,255,0.03)",
-  bg3: "rgba(255,255,255,0.055)",
-  border: "rgba(255,255,255,0.07)",
-  muted: "#444",
-  sec: "#777",
-  text: "#e8e8e8",
-  green: "#16a34a",
-  greenBg: "rgba(22,163,74,0.10)",
-  greenText: "#4ade80",
-  red: "#dc2626",
-  redBg: "rgba(220,38,38,0.10)",
-  redText: "#f87171",
+  gold: '#F5C518',
+  goldDim: 'rgba(245,197,24,0.10)',
+  goldBorder: 'rgba(245,197,24,0.20)',
+  bg: '#070707',
+  bg2: 'rgba(255,255,255,0.03)',
+  bg3: 'rgba(255,255,255,0.055)',
+  border: 'rgba(255,255,255,0.07)',
+  muted: '#444',
+  sec: '#777',
+  text: '#e8e8e8',
+  green: '#16a34a',
+  greenBg: 'rgba(22,163,74,0.10)',
+  greenText: '#4ade80',
+  red: '#dc2626',
+  redBg: 'rgba(220,38,38,0.10)',
+  redText: '#f87171',
 }
 
 const gen = (n = 60) => {
@@ -33,8 +33,8 @@ const gen = (n = 60) => {
 }
 
 const WALLET_ADDRESSES = {
-  BTC: '1A1zP1eP5QGefi2DMPTfTL5SLmv7Divf', // replace with your real BTC address
-  USDT: 'TN3W4xx8BdkJ3DxBZMB5MjY3Q5S7JB7mZ', // replace with your real USDT TRC20 address
+  BTC: '1A1zP1eP5QGefi2DMPTfTL5SLmv7Divf',
+  USDT: 'TN3W4xx8BdkJ3DxBZMB5MjY3Q5S7JB7mZ',
 }
 
 const BOTS = [
@@ -67,47 +67,68 @@ export default function Dashboard() {
   const [tradeLoading, setTradeLoading] = useState(false)
   const [tradeError, setTradeError] = useState('')
 
+  // Simulation
+  const [simulatedPnl, setSimulatedPnl] = useState(0)
+  const [pnlHistory, setPnlHistory] = useState<{ t: string; p: number }[]>([{ t: '0', p: 0 }])
+  const simulationRef = useRef<NodeJS.Timeout | null>(null)
+
   useEffect(() => {
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       setUser(user)
 
-      const { data: w } = await supabase
-        .from('wallets')
-        .select('*')
-        .eq('user_id', user.id)
-        .single()
+      const { data: w } = await supabase.from('wallets').select('*').eq('user_id', user.id).single()
       setWallet(w)
 
-      const { data: s } = await supabase
-        .from('bot_sessions')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('started_at', { ascending: false })
+      const { data: s } = await supabase.from('bot_sessions').select('*').eq('user_id', user.id).order('started_at', { ascending: false })
       setSessions(s ?? [])
 
-      const { data: d } = await supabase
-        .from('deposits')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+      const { data: d } = await supabase.from('deposits').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
       setDeposits(d ?? [])
 
       setLoading(false)
     }
     load()
-  }, [])
+  }, [router])
+
+  const balance = wallet?.balance ?? 0
+  const activeSession = sessions.find(s => s.status === 'active')
+  const totalPnl = sessions.reduce((acc, s) => acc + (s.current_pnl ?? 0), 0)
+
+  useEffect(() => {
+    if (!activeSession) return
+
+    const target = activeSession.target_profit
+    const stopLoss = activeSession.target_loss
+    let current = activeSession.current_pnl ?? 0
+    let tick = 0
+
+    setSimulatedPnl(+current.toFixed(2))
+    setPnlHistory([{ t: '0', p: +current.toFixed(2) }])
+
+    simulationRef.current = setInterval(() => {
+      tick++
+      const progress = Math.min(tick / 120, 1)
+      const trend = target * progress * 0.015
+      const noise = (Math.random() - 0.42) * (target * 0.04)
+      current = Math.max(-stopLoss * 0.8, current + trend + noise)
+      current = Math.min(current, target)
+
+      setSimulatedPnl(+current.toFixed(2))
+      setPnlHistory(prev => [...prev, { t: String(tick), p: +current.toFixed(2) }].slice(-60))
+
+      if (current >= target && simulationRef.current) clearInterval(simulationRef.current)
+    }, 1500)
+
+    return () => { if (simulationRef.current) clearInterval(simulationRef.current) }
+  }, [activeSession?.id])
 
   const handleDeposit = async () => {
     const amt = parseFloat(depositAmount)
     if (!amt || amt < 85) { alert('Minimum deposit is $85'); return }
     setDepositLoading(true)
-    await supabase.from('deposits').insert({
-      user_id: user.id,
-      currency,
-      amount: amt,
-    })
+    await supabase.from('deposits').insert({ user_id: user.id, currency, amount: amt })
     setDepositLoading(false)
     setDepositDone(true)
   }
@@ -120,28 +141,11 @@ export default function Dashboard() {
     if (!amt || !tp || !tl) { setTradeError('Fill all fields.'); return }
     if (amt > (wallet?.balance ?? 0)) { setTradeError('Insufficient wallet balance.'); return }
     if (amt < selectedBot.min) { setTradeError(`Minimum is $${selectedBot.min}.`); return }
+
     setTradeLoading(true)
-    const { data: botRow } = await supabase
-      .from('bots')
-      .select('id')
-      .eq('name', selectedBot.name)
-      .single()
-
-    await supabase.from('bot_sessions').insert({
-      user_id: user.id,
-      bot_id: botRow?.id ?? null,
-      amount: amt,
-      target_profit: tp,
-      target_loss: tl,
-    })
-
-    // Deduct from wallet via server route
-    await fetch('/api/wallet/deduct', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: user.id, amount: amt }),
-    })
-
+    const { data: botRow } = await supabase.from('bots').select('id').eq('name', selectedBot.name).single()
+    await supabase.from('bot_sessions').insert({ user_id: user.id, bot_id: botRow?.id ?? null, amount: amt, target_profit: tp, target_loss: tl })
+    await fetch('/api/wallet/deduct', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.id, amount: amt }) })
     setTradeLoading(false)
     setView('home')
     window.location.reload()
@@ -151,10 +155,6 @@ export default function Dashboard() {
     await supabase.auth.signOut()
     router.push('/login')
   }
-
-  const balance = wallet?.balance ?? 0
-  const activeSession = sessions.find(s => s.status === 'active')
-  const totalPnl = sessions.reduce((acc, s) => acc + (s.current_pnl ?? 0), 0)
 
   if (loading) return (
     <div style={{ height: '100vh', background: G.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: G.gold, fontSize: 14 }}>
@@ -192,22 +192,20 @@ export default function Dashboard() {
           <span style={{ fontSize: 13, fontWeight: 700, color: G.gold, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
             {view === 'home' ? 'Dashboard' : view === 'deposit' ? 'Deposit Funds' : 'Activate Bot'}
           </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 10, color: G.muted }}>Wallet Balance</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: G.gold }}>${balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-            </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 10, color: G.muted }}>Wallet Balance</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: G.gold }}>${balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
           </div>
         </div>
 
         {/* Body */}
         <div style={{ flex: 1, overflow: 'auto', padding: 20 }}>
 
-          {/* ── HOME VIEW ── */}
+          {/* HOME VIEW */}
           {view === 'home' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-              {/* Stats row */}
+              {/* Stats */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
                 {[
                   { label: 'Wallet Balance', value: `$${balance.toFixed(2)}`, color: G.gold },
@@ -222,7 +220,7 @@ export default function Dashboard() {
                 ))}
               </div>
 
-              {/* Chart */}
+              {/* Portfolio chart */}
               <div style={{ background: G.bg2, border: `1px solid ${G.border}`, borderRadius: 12, padding: 16 }}>
                 <div style={{ fontSize: 11, color: G.muted, marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Portfolio Curve</div>
                 <ResponsiveContainer width="100%" height={180}>
@@ -241,23 +239,69 @@ export default function Dashboard() {
                 </ResponsiveContainer>
               </div>
 
-              {/* Active session */}
+              {/* Active bot session */}
               {activeSession ? (
                 <div style={{ background: G.bg2, border: `1px solid ${G.goldBorder}`, borderRadius: 12, padding: 20 }}>
-                  <div style={{ fontSize: 11, color: G.gold, marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Active Bot Session</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+
+                  {/* Header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <div style={{ fontSize: 11, color: G.gold, textTransform: 'uppercase', letterSpacing: '0.06em' }}>● Active Bot Session</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: G.greenText, boxShadow: `0 0 6px ${G.greenText}` }} />
+                      <span style={{ fontSize: 11, color: G.greenText, fontWeight: 700 }}>RUNNING</span>
+                    </div>
+                  </div>
+
+                  {/* Stats */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 16 }}>
                     {[
-                      { label: 'Amount', value: `$${activeSession.amount}` },
-                      { label: 'Current P&L', value: `${activeSession.current_pnl >= 0 ? '+' : ''}$${activeSession.current_pnl}`, color: activeSession.current_pnl >= 0 ? G.greenText : G.redText },
+                      { label: 'Amount', value: `$${activeSession.amount}`, color: G.text },
+                      { label: 'Current P&L', value: `${simulatedPnl >= 0 ? '+' : ''}$${simulatedPnl}`, color: simulatedPnl >= 0 ? G.greenText : G.redText },
                       { label: 'Target Profit', value: `$${activeSession.target_profit}`, color: G.greenText },
                       { label: 'Stop Loss', value: `$${activeSession.target_loss}`, color: G.redText },
                     ].map(s => (
-                      <div key={s.label}>
+                      <div key={s.label} style={{ background: G.bg3, borderRadius: 10, padding: '12px 16px' }}>
                         <div style={{ fontSize: 10, color: G.muted, marginBottom: 4 }}>{s.label}</div>
-                        <div style={{ fontSize: 18, fontWeight: 700, color: s.color ?? G.text }}>{s.value}</div>
+                        <div style={{ fontSize: 20, fontWeight: 800, color: s.color, transition: 'color 0.3s' }}>{s.value}</div>
                       </div>
                     ))}
                   </div>
+
+                  {/* Progress bar */}
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <span style={{ fontSize: 11, color: G.muted }}>Progress to target</span>
+                      <span style={{ fontSize: 11, color: G.gold, fontWeight: 700 }}>
+                        {Math.min(100, Math.max(0, simulatedPnl / activeSession.target_profit * 100)).toFixed(1)}%
+                      </span>
+                    </div>
+                    <div style={{ height: 6, background: G.bg3, borderRadius: 99, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${Math.min(100, Math.max(0, simulatedPnl / activeSession.target_profit * 100))}%`, background: `linear-gradient(90deg, ${G.gold}, ${G.greenText})`, borderRadius: 99, transition: 'width 1s ease' }} />
+                    </div>
+                  </div>
+
+                  {/* Live P&L chart */}
+                  <ResponsiveContainer width="100%" height={120}>
+                    <AreaChart data={pnlHistory}>
+                      <defs>
+                        <linearGradient id="pnlGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={simulatedPnl >= 0 ? G.greenText : G.redText} stopOpacity={0.2} />
+                          <stop offset="100%" stopColor={simulatedPnl >= 0 ? G.greenText : G.redText} stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <XAxis dataKey="t" hide />
+                      <YAxis hide domain={['auto', 'auto']} />
+                      <Tooltip contentStyle={{ background: '#111', border: `1px solid ${G.border}`, borderRadius: 8, fontSize: 11 }} formatter={(v: number) => [`$${v.toFixed(2)}`, 'P&L']} labelFormatter={() => ''} />
+                      <Area type="monotone" dataKey="p" stroke={simulatedPnl >= 0 ? G.greenText : G.redText} strokeWidth={2} fill="url(#pnlGrad)" dot={false} isAnimationActive={false} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+
+                  {/* Target reached */}
+                  {simulatedPnl >= activeSession.target_profit && (
+                    <div style={{ marginTop: 12, padding: '10px 16px', background: G.greenBg, border: `1px solid ${G.green}`, borderRadius: 8, textAlign: 'center' }}>
+                      <span style={{ color: G.greenText, fontWeight: 700, fontSize: 13 }}>🎯 Target reached! +${activeSession.target_profit} profit</span>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div style={{ background: G.bg2, border: `1px solid ${G.border}`, borderRadius: 12, padding: 20, textAlign: 'center' }}>
@@ -302,7 +346,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* ── DEPOSIT VIEW ── */}
+          {/* DEPOSIT VIEW */}
           {view === 'deposit' && (
             <div style={{ maxWidth: 480, margin: '0 auto' }}>
               <div style={{ background: G.bg2, border: `1px solid ${G.border}`, borderRadius: 16, padding: 28, display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -313,7 +357,6 @@ export default function Dashboard() {
 
                 {!depositDone ? (
                   <>
-                    {/* Currency toggle */}
                     <div>
                       <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>Select Currency</div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -326,7 +369,6 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    {/* Wallet address */}
                     <div>
                       <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>Send {currency} to this address</div>
                       <div style={{ background: G.bg3, border: `1px solid ${G.border}`, borderRadius: 8, padding: '12px 16px', fontSize: 12, color: G.gold, wordBreak: 'break-all', letterSpacing: '0.02em' }}>
@@ -335,16 +377,10 @@ export default function Dashboard() {
                       <div style={{ fontSize: 11, color: G.muted, marginTop: 6 }}>⚠ Only send {currency} to this address</div>
                     </div>
 
-                    {/* Amount */}
                     <div>
                       <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>Amount (USD equivalent)</div>
-                      <input
-                        type="number"
-                        placeholder="Min. $85"
-                        value={depositAmount}
-                        onChange={e => setDepositAmount(e.target.value)}
-                        style={{ width: '100%', background: G.bg3, border: `1px solid ${G.border}`, borderRadius: 8, padding: '12px 16px', fontSize: 13, color: G.text, outline: 'none', boxSizing: 'border-box' }}
-                      />
+                      <input type="number" placeholder="Min. $85" value={depositAmount} onChange={e => setDepositAmount(e.target.value)}
+                        style={{ width: '100%', background: G.bg3, border: `1px solid ${G.border}`, borderRadius: 8, padding: '12px 16px', fontSize: 13, color: G.text, outline: 'none', boxSizing: 'border-box' }} />
                       {depositAmount && parseFloat(depositAmount) >= 85 && (
                         <div style={{ fontSize: 12, color: G.greenText, marginTop: 6 }}>
                           You will be credited: ${(parseFloat(depositAmount) - 1).toFixed(2)} (after $1 fee)
@@ -372,7 +408,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* ── TRADE VIEW ── */}
+          {/* TRADE VIEW */}
           {view === 'trade' && (
             <div style={{ maxWidth: 520, margin: '0 auto' }}>
               <div style={{ background: G.bg2, border: `1px solid ${G.border}`, borderRadius: 16, padding: 28, display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -391,7 +427,6 @@ export default function Dashboard() {
                   </div>
                 ) : (
                   <>
-                    {/* Bot selector */}
                     <div>
                       <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>Select Bot</div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -411,14 +446,12 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    {/* Amount */}
                     <div>
                       <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>Trade Amount (USD)</div>
                       <input type="number" placeholder={`Min. $${selectedBot.min}`} value={tradeAmount} onChange={e => setTradeAmount(e.target.value)}
                         style={{ width: '100%', background: G.bg3, border: `1px solid ${G.border}`, borderRadius: 8, padding: '12px 16px', fontSize: 13, color: G.text, outline: 'none', boxSizing: 'border-box' }} />
                     </div>
 
-                    {/* Target P&L */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                       <div>
                         <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>Take Profit at ($)</div>
@@ -443,7 +476,6 @@ export default function Dashboard() {
               </div>
             </div>
           )}
-
         </div>
       </div>
     </div>
