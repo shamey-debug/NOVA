@@ -62,6 +62,351 @@ const STEPS = [
   { n: '04', title: 'Collect Profits', desc: 'Watch your P&L grow live. Close and collect when you hit target.' },
 ]
 
+// ── NEW: Live cashout notifications ─────────────────────────
+const CASHOUTS = [
+  { name: 'Brian K.', amount: '$1,240', time: '2m ago', flag: '🇰🇪' },
+  { name: 'Amara O.', amount: '$620', time: '4m ago', flag: '🇳🇬' },
+  { name: 'James M.', amount: '$3,800', time: '7m ago', flag: '🇿🇦' },
+  { name: 'Fatima H.', amount: '$980', time: '9m ago', flag: '🇪🇬' },
+  { name: 'David N.', amount: '$455', time: '11m ago', flag: '🇬🇭' },
+  { name: 'Sofia R.', amount: '$2,100', time: '14m ago', flag: '🇧🇷' },
+  { name: 'Michael T.', amount: '$770', time: '16m ago', flag: '🇺🇸' },
+  { name: 'Priya S.', amount: '$1,560', time: '19m ago', flag: '🇮🇳' },
+  { name: 'Luca B.', amount: '$390', time: '22m ago', flag: '🇮🇹' },
+  { name: 'Aisha D.', amount: '$5,000', time: '25m ago', flag: '🇸🇦' },
+]
+
+// ── NEW: Testimonials ────────────────────────────────────────
+const TESTIMONIALS = [
+  {
+    name: 'Brian Kamau',
+    handle: '@briankamau',
+    flag: '🇰🇪',
+    avatar: 'BK',
+    text: 'Started with $200. Bot hit target twice in one week. Withdrew $840 profit. Nova is the real deal — nothing else comes close.',
+    profit: '+$840',
+    days: '7 days',
+  },
+  {
+    name: 'Amara Okonkwo',
+    handle: '@amaratrades',
+    flag: '🇳🇬',
+    avatar: 'AO',
+    text: 'I was skeptical at first but the live P&L dashboard convinced me. Watching the bot work in real time is wild. Cashed out $620 this month.',
+    profit: '+$620',
+    days: '30 days',
+  },
+  {
+    name: 'James Mwangi',
+    handle: '@jmwangi_fx',
+    flag: '🇿🇦',
+    avatar: 'JM',
+    text: 'The execution speed is insane. I\'ve used 4 other platforms and Nova is the only one that actually delivers on the bot automation promise.',
+    profit: '+$3,800',
+    days: '45 days',
+  },
+  {
+    name: 'Fatima Hassan',
+    handle: '@fatima_h',
+    flag: '🇪🇬',
+    avatar: 'FH',
+    text: 'Set it and forget it is real here. Activated a bot before bed, woke up to +$320. Customer support is also super responsive.',
+    profit: '+$980',
+    days: '21 days',
+  },
+  {
+    name: 'David Nkosi',
+    handle: '@davidnkosi',
+    flag: '🇬🇭',
+    avatar: 'DN',
+    text: 'Deposited $150 as a test. Within 10 days I hit my $400 target. Now running $500 sessions consistently. Nova changed my income.',
+    profit: '+$455',
+    days: '14 days',
+  },
+  {
+    name: 'Sofia Ribeiro',
+    handle: '@sofiartrades',
+    flag: '🇧🇷',
+    avatar: 'SR',
+    text: 'Ultra fast withdrawals. Requested Monday morning, cleared same day. The platform UI is clean and everything just works on my phone.',
+    profit: '+$2,100',
+    days: '60 days',
+  },
+]
+
+// ── Component: Cashout Banner ────────────────────────────────
+function CashoutBanner() {
+  const bannerRef = useRef<HTMLDivElement>(null)
+  const [toastIdx, setToastIdx] = useState(0)
+  const [toastVisible, setToastVisible] = useState(false)
+
+  // Scrolling cashout strip
+  useEffect(() => {
+    let raf: number
+    let x = 0
+    const step = () => {
+      x -= 0.6
+      if (bannerRef.current) {
+        const half = bannerRef.current.scrollWidth / 2
+        if (Math.abs(x) >= half) x = 0
+        bannerRef.current.style.transform = `translateX(${x}px)`
+      }
+      raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [])
+
+  // Pop-up toast notifications
+  useEffect(() => {
+    let idx = 0
+    const cycle = () => {
+      idx = (idx + 1) % CASHOUTS.length
+      setToastIdx(idx)
+      setToastVisible(true)
+      setTimeout(() => setToastVisible(false), 3200)
+    }
+    const interval = setInterval(cycle, 5000)
+    // First one after 2s
+    const first = setTimeout(cycle, 2000)
+    return () => { clearInterval(interval); clearTimeout(first) }
+  }, [])
+
+  const toast = CASHOUTS[toastIdx]
+
+  return (
+    <>
+      {/* Scrolling strip */}
+      <div style={{
+        background: 'rgba(34,197,94,0.06)',
+        borderBottom: '1px solid rgba(34,197,94,0.12)',
+        padding: '8px 0',
+        overflow: 'hidden',
+      }}>
+        <div ref={bannerRef} style={{ display: 'inline-flex', gap: '40px', whiteSpace: 'nowrap' }}>
+          {[...CASHOUTS, ...CASHOUTS].map((c, i) => (
+            <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', fontSize: '11px' }}>
+              <span style={{ fontSize: 14 }}>{c.flag}</span>
+              <span style={{ color: '#888' }}>{c.name}</span>
+              <span style={{
+                color: '#4ade80', fontWeight: 700, background: 'rgba(34,197,94,0.12)',
+                padding: '2px 8px', borderRadius: 20, fontSize: '11px',
+              }}>💸 cashed out {c.amount}</span>
+              <span style={{ color: '#444', fontSize: 10 }}>{c.time}</span>
+              <span style={{ color: '#222', marginLeft: 8 }}>·</span>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Floating toast */}
+      <div style={{
+        position: 'fixed',
+        bottom: 24,
+        left: '50%',
+        transform: `translateX(-50%) translateY(${toastVisible ? '0' : '80px'})`,
+        opacity: toastVisible ? 1 : 0,
+        transition: 'all 0.4s cubic-bezier(0.34,1.56,0.64,1)',
+        zIndex: 200,
+        pointerEvents: 'none',
+        width: 'calc(100% - 32px)',
+        maxWidth: 360,
+      }}>
+        <div style={{
+          background: 'rgba(10,10,10,0.95)',
+          border: '1px solid rgba(34,197,94,0.3)',
+          borderRadius: 14,
+          padding: '12px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          backdropFilter: 'blur(20px)',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(34,197,94,0.1)',
+        }}>
+          <div style={{
+            width: 38, height: 38, borderRadius: '50%',
+            background: 'rgba(34,197,94,0.15)',
+            border: '1px solid rgba(34,197,94,0.3)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 18, flexShrink: 0,
+          }}>
+            {toast.flag}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, color: '#888', marginBottom: 2 }}>Live withdrawal</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#e8e8e8' }}>
+              {toast.name} just cashed out{' '}
+              <span style={{ color: '#4ade80' }}>{toast.amount}</span>
+            </div>
+          </div>
+          <div style={{
+            width: 8, height: 8, borderRadius: '50%', background: '#4ade80',
+            flexShrink: 0, animation: 'novaPulse 1.5s infinite',
+          }} />
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ── Component: Testimonials ──────────────────────────────────
+function Testimonials() {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [activeIdx, setActiveIdx] = useState(0)
+
+  // Auto-scroll on mobile
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const handleScroll = () => {
+      const idx = Math.round(el.scrollLeft / (el.offsetWidth * 0.82 + 12))
+      setActiveIdx(Math.min(idx, TESTIMONIALS.length - 1))
+    }
+    el.addEventListener('scroll', handleScroll, { passive: true })
+    return () => el.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  return (
+    <section style={{
+      padding: '52px 0',
+      borderBottom: `1px solid ${G.border}`,
+      overflow: 'hidden',
+    }}>
+      <div style={{ textAlign: 'center', marginBottom: 32, padding: '0 20px' }}>
+        <div style={{ fontSize: 10, color: G.gold, letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 10 }}>
+          Verified Traders
+        </div>
+        <h2 style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.02em', margin: '0 0 10px' }}>
+          Real people. Real profits.
+        </h2>
+        <p style={{ fontSize: 13, color: G.sec, maxWidth: 360, margin: '0 auto' }}>
+          Join thousands of traders already cashing out with Nova bots.
+        </p>
+      </div>
+
+      {/* Scrollable cards */}
+      <div ref={scrollRef} style={{
+        display: 'flex',
+        gap: 12,
+        overflowX: 'auto',
+        scrollSnapType: 'x mandatory',
+        scrollBehavior: 'smooth',
+        paddingLeft: 20,
+        paddingRight: 20,
+        paddingBottom: 8,
+        scrollbarWidth: 'none',
+        WebkitOverflowScrolling: 'touch',
+      } as React.CSSProperties}>
+        {TESTIMONIALS.map((t, i) => (
+          <div key={t.name} style={{
+            background: 'linear-gradient(135deg, rgba(245,197,24,0.04) 0%, rgba(255,255,255,0.02) 100%)',
+            border: `1px solid ${G.goldBorder}`,
+            borderRadius: 18,
+            padding: '22px 20px',
+            minWidth: 'min(82vw, 300px)',
+            maxWidth: 300,
+            flexShrink: 0,
+            scrollSnapAlign: 'start',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 14,
+            position: 'relative',
+            overflow: 'hidden',
+          }}>
+            {/* Quote mark */}
+            <div style={{
+              position: 'absolute', top: 14, right: 18,
+              fontSize: 48, color: 'rgba(245,197,24,0.07)',
+              fontFamily: 'Georgia, serif', lineHeight: 1, userSelect: 'none',
+            }}>"</div>
+
+            {/* Profit badge */}
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              background: G.greenBg, border: '1px solid rgba(34,197,94,0.2)',
+              borderRadius: 20, padding: '4px 12px', width: 'fit-content',
+            }}>
+              <span style={{ fontSize: 12, fontWeight: 800, color: G.greenText }}>{t.profit}</span>
+              <span style={{ fontSize: 10, color: '#444' }}>in</span>
+              <span style={{ fontSize: 11, color: '#666' }}>{t.days}</span>
+            </div>
+
+            {/* Text */}
+            <p style={{
+              fontSize: 13, color: '#aaa', lineHeight: 1.7,
+              margin: 0, flex: 1,
+            }}>
+              "{t.text}"
+            </p>
+
+            {/* User */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, borderTop: `1px solid ${G.border}`, paddingTop: 14 }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: '50%',
+                background: G.goldDim,
+                border: `1px solid ${G.goldBorder}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 11, fontWeight: 800, color: G.gold, flexShrink: 0,
+              }}>{t.avatar}</div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: G.text }}>
+                  {t.flag} {t.name}
+                </div>
+                <div style={{ fontSize: 11, color: G.muted }}>{t.handle}</div>
+              </div>
+              <div style={{ marginLeft: 'auto', fontSize: 10, color: G.gold }}>✓ verified</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Dot indicators */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 16 }}>
+        {TESTIMONIALS.map((_, i) => (
+          <div key={i} onClick={() => {
+            if (!scrollRef.current) return
+            const cardW = Math.min(window.innerWidth * 0.82, 300) + 12
+            scrollRef.current.scrollTo({ left: i * cardW, behavior: 'smooth' })
+          }} style={{
+            width: i === activeIdx ? 18 : 6,
+            height: 6, borderRadius: 3,
+            background: i === activeIdx ? G.gold : 'rgba(255,255,255,0.12)',
+            transition: 'all 0.3s',
+            cursor: 'pointer',
+          }} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+// ── Component: Trust bar ─────────────────────────────────────
+function TrustBar() {
+  return (
+    <div style={{
+      padding: '20px',
+      borderBottom: `1px solid ${G.border}`,
+      display: 'flex',
+      justifyContent: 'center',
+      gap: '24px',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+    }}>
+      {[
+        { icon: '🔐', label: '2FA Protected' },
+        { icon: '💼', label: 'Non-custodial' },
+        { icon: '⚡', label: 'Always-on Bots' },
+        { icon: '🌍', label: '80+ Countries' },
+      ].map(t => (
+        <div key={t.label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: G.sec }}>
+          <span style={{ fontSize: 14 }}>{t.icon}</span>
+          <span>{t.label}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function HomePage() {
   const router = useRouter()
   const [btcData] = useState(() => genPrices(84000))
@@ -90,9 +435,32 @@ export default function HomePage() {
   const up = last >= first
 
   return (
-    <div style={{ background: G.bg, minHeight: '100vh', color: G.text, fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif", overflowX: 'hidden' }}>
+    <div style={{
+      background: G.bg, minHeight: '100vh', color: G.text,
+      fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif",
+      overflowX: 'hidden',
+    }}>
 
-      {/* Ticker */}
+      {/* Keyframe injection */}
+      <style>{`
+        @keyframes novaPulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.4; transform: scale(0.7); }
+        }
+        .nova-hide-scrollbar::-webkit-scrollbar { display: none; }
+        @media (min-width: 768px) {
+          .nova-mobile-only { display: none !important; }
+          .nova-desktop-nav { display: flex !important; }
+        }
+        @media (max-width: 767px) {
+          .nova-desktop-nav { display: none !important; }
+        }
+      `}</style>
+
+      {/* ── Live cashout banner + toast ── */}
+      <CashoutBanner />
+
+      {/* ── Price ticker ── */}
       <div style={{ background: 'rgba(245,197,24,0.04)', borderBottom: `1px solid ${G.border}`, padding: '6px 0', overflow: 'hidden' }}>
         <div ref={tickerRef} style={{ display: 'inline-flex', gap: '48px', whiteSpace: 'nowrap' }}>
           {[...TICKERS, ...TICKERS].map((t, i) => (
@@ -105,14 +473,24 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Nav */}
-      <nav style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', height: 56, borderBottom: `1px solid ${G.border}`, position: 'sticky', top: 0, zIndex: 100, background: 'rgba(7,7,7,0.96)', backdropFilter: 'blur(24px)' }}>
+      {/* ── Nav ── */}
+      <nav style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 20px', height: 56, borderBottom: `1px solid ${G.border}`,
+        position: 'sticky', top: 0, zIndex: 100,
+        background: 'rgba(7,7,7,0.96)', backdropFilter: 'blur(24px)',
+      }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 32, height: 32, background: G.goldDim, border: `1px solid ${G.goldBorder}`, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}>⚡</div>
+          <div style={{
+            width: 32, height: 32, background: G.goldDim,
+            border: `1px solid ${G.goldBorder}`, borderRadius: 8,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15,
+          }}>⚡</div>
           <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: '0.14em', color: G.gold }}>NOVA</span>
         </div>
+
         {/* Desktop nav */}
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }} className="desktop-nav">
+        <div className="nova-desktop-nav" style={{ gap: 4, alignItems: 'center' }}>
           <button onClick={() => router.push('/login')}
             style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, border: `1px solid ${G.border}`, background: 'transparent', color: G.sec, cursor: 'pointer' }}>
             Log In
@@ -122,16 +500,21 @@ export default function HomePage() {
             Start Trading →
           </button>
         </div>
+
         {/* Mobile hamburger */}
-        <button onClick={() => setMenuOpen(!menuOpen)}
+        <button className="nova-mobile-only" onClick={() => setMenuOpen(!menuOpen)}
           style={{ background: 'transparent', border: 'none', color: G.text, fontSize: 22, cursor: 'pointer', padding: 4 }}>
           {menuOpen ? '✕' : '☰'}
         </button>
       </nav>
 
-      {/* Mobile menu */}
+      {/* ── Mobile menu ── */}
       {menuOpen && (
-        <div style={{ position: 'fixed', top: 56, left: 0, right: 0, bottom: 0, background: G.bg, zIndex: 99, padding: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{
+          position: 'fixed', top: 56, left: 0, right: 0, bottom: 0,
+          background: G.bg, zIndex: 99, padding: 24,
+          display: 'flex', flexDirection: 'column', gap: 12,
+        }}>
           <button onClick={() => { router.push('/signup'); setMenuOpen(false) }}
             style={{ padding: 16, borderRadius: 10, fontSize: 16, fontWeight: 800, border: 'none', background: G.gold, color: '#000', cursor: 'pointer' }}>
             Create Free Account →
@@ -155,9 +538,18 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Hero */}
+      {/* ── Trust bar ── */}
+      <TrustBar />
+
+      {/* ── Hero ── */}
       <section style={{ padding: '52px 20px 40px', textAlign: 'center', borderBottom: `1px solid ${G.border}` }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 14px', borderRadius: 100, border: `1px solid ${G.goldBorder}`, background: G.goldDim, fontSize: 10, letterSpacing: '0.18em', color: G.gold, textTransform: 'uppercase', marginBottom: 24 }}>
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '4px 14px', borderRadius: 100,
+          border: `1px solid ${G.goldBorder}`, background: G.goldDim,
+          fontSize: 10, letterSpacing: '0.18em', color: G.gold,
+          textTransform: 'uppercase', marginBottom: 24,
+        }}>
           ⚡ Institutional · Ultra-Fast · Secure
         </div>
         <h1 style={{ fontSize: 'clamp(32px, 8vw, 56px)', fontWeight: 900, lineHeight: 1.08, letterSpacing: '-0.03em', margin: '0 0 16px' }}>
@@ -177,7 +569,7 @@ export default function HomePage() {
           </button>
         </div>
 
-        {/* Stats */}
+        {/* Stats grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, maxWidth: 400, margin: '0 auto 40px' }}>
           {STATS.map(s => (
             <div key={s.label} style={{ background: G.bg2, border: `1px solid ${G.border}`, borderRadius: 12, padding: '16px 12px' }}>
@@ -187,7 +579,7 @@ export default function HomePage() {
           ))}
         </div>
 
-        {/* BTC Chart card */}
+        {/* BTC Chart */}
         <div style={{ background: G.bg2, border: `1px solid ${G.border}`, borderRadius: 16, overflow: 'hidden', maxWidth: 480, margin: '0 auto' }}>
           <div style={{ padding: '16px 18px 12px', borderBottom: `1px solid ${G.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
@@ -211,7 +603,11 @@ export default function HomePage() {
                 </defs>
                 <XAxis dataKey="i" hide />
                 <YAxis hide domain={['auto', 'auto']} />
-                <Tooltip contentStyle={{ background: '#111', border: `1px solid ${G.border}`, borderRadius: 8, fontSize: 11, color: '#fff' }} formatter={(v: number) => [`$${Math.round(v).toLocaleString()}`, 'Price']} labelFormatter={() => ''} />
+                <Tooltip
+                  contentStyle={{ background: '#111', border: `1px solid ${G.border}`, borderRadius: 8, fontSize: 11, color: '#fff' }}
+                  formatter={(v: number) => [`$${Math.round(v).toLocaleString()}`, 'Price']}
+                  labelFormatter={() => ''}
+                />
                 <Area type="monotone" dataKey="price" stroke={G.gold} strokeWidth={2} fill="url(#gGold)" dot={false} />
               </AreaChart>
             </ResponsiveContainer>
@@ -219,14 +615,14 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* How it works */}
+      {/* ── How it works ── */}
       <section style={{ padding: '52px 20px', borderBottom: `1px solid ${G.border}` }}>
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
           <div style={{ fontSize: 10, color: G.gold, letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 10 }}>How It Works</div>
           <h2 style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.02em', margin: 0 }}>From signup to profit in 4 steps.</h2>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 480, margin: '0 auto' }}>
-          {STEPS.map((s, i) => (
+          {STEPS.map((s) => (
             <div key={s.n} style={{ display: 'flex', gap: 16, alignItems: 'flex-start', background: G.bg2, border: `1px solid ${G.border}`, borderRadius: 14, padding: '18px 20px' }}>
               <div style={{ width: 36, height: 36, borderRadius: '50%', background: G.goldDim, border: `1px solid ${G.goldBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: G.gold, flexShrink: 0 }}>{s.n}</div>
               <div>
@@ -244,7 +640,10 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Features */}
+      {/* ── Testimonials ── */}
+      <Testimonials />
+
+      {/* ── Features ── */}
       <section style={{ padding: '52px 20px', borderBottom: `1px solid ${G.border}` }}>
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <div style={{ fontSize: 10, color: G.gold, letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 10 }}>Platform Edge</div>
@@ -263,9 +662,13 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* CTA */}
+      {/* ── CTA ── */}
       <section style={{ padding: '52px 20px 72px' }}>
-        <div style={{ background: 'rgba(245,197,24,0.05)', border: `1px solid ${G.goldBorder}`, borderRadius: 20, padding: '48px 24px', textAlign: 'center', position: 'relative', overflow: 'hidden', maxWidth: 560, margin: '0 auto' }}>
+        <div style={{
+          background: 'rgba(245,197,24,0.05)', border: `1px solid ${G.goldBorder}`,
+          borderRadius: 20, padding: '48px 24px', textAlign: 'center',
+          position: 'relative', overflow: 'hidden', maxWidth: 560, margin: '0 auto',
+        }}>
           <div style={{ position: 'absolute', inset: 0, backgroundImage: `radial-gradient(circle, rgba(245,197,24,0.12) 1px, transparent 1px)`, backgroundSize: '24px 24px', opacity: 0.4 }} />
           <div style={{ position: 'relative', zIndex: 1 }}>
             <h2 style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.02em', margin: '0 0 12px' }}>Ready to trade smarter?</h2>
@@ -286,10 +689,14 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <div style={{ borderTop: `1px solid ${G.border}`, padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+      {/* ── Footer ── */}
+      <div style={{
+        borderTop: `1px solid ${G.border}`, padding: '20px',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        flexWrap: 'wrap', gap: 12,
+      }}>
         <span style={{ fontSize: 12, color: G.muted }}>⚡ NOVA · AI Trading Platform</span>
-        <div style={{ display: 'flex', gap: 16 }}>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
           {[['Pricing', '/pricing'], ['Bots', '/bots'], ['Sign Up', '/signup'], ['Log In', '/login']].map(([l, h]) => (
             <button key={l} onClick={() => router.push(h)}
               style={{ background: 'transparent', border: 'none', color: G.muted, fontSize: 12, cursor: 'pointer' }}>{l}</button>
