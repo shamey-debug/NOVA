@@ -743,7 +743,7 @@ export default function HomePage() {
       }}>
         <span style={{ fontSize: 12, color: G.muted }}>⚡ NOVA · AI Trading Platform</span>
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          {[['Pricing', '/pricing'], ['Bots', '/bots'], ['Sign Up', '/signup'], ['Log In', '/login']].map(([l, h]) => (
+         {[['Bots', '/bots'], ['Sign Up', '/signup'], ['Log In', '/login']].map(([l, h]) => (
             <button key={l} onClick={() => router.push(h)}
               style={{ background: 'transparent', border: 'none', color: G.muted, fontSize: 12, cursor: 'pointer' }}>{l}</button>
           ))}
