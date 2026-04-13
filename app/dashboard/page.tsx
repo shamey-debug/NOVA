@@ -921,13 +921,13 @@ export default function Dashboard() {
                   style={{ background: G.gold, color: '#000', fontWeight: 800, fontSize: 15, padding: 16, borderRadius: 12, border: 'none', cursor: 'pointer', opacity: withdrawLoading ? 0.6 : 1 }}>
                   {withdrawLoading ? 'Submitting...' : 'Request Withdrawal →'}
                 </button>
-                <div style={{ fontSize: 11, color: G.muted, textAlign: 'center' }}>Processed within 24 hours · Minimum $10</div>
+                <div style={{ fontSize: 11, color: G.muted, textAlign: 'center' }}>Withdrawals are processed instantly · Minimum $10</div>
               </>
             ) : (
               <div style={{ textAlign: 'center', padding: 20 }}>
                 <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
                 <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>Withdrawal Requested</div>
-                <div style={{ fontSize: 13, color: G.muted, marginBottom: 20 }}>Processed within 24h to your {withdrawNetwork} address.</div>
+                <div style={{ fontSize: 13, color: G.muted, marginBottom: 20 }}>Your withdrawal has been processed successfully.</div>
                 <button onClick={() => { setShowWithdrawModal(false); setWithdrawDone(false); setWithdrawAmount(''); setWithdrawAddress('') }}
                   style={{ background: G.goldDim, color: G.gold, border: `1px solid ${G.goldBorder}`, fontWeight: 700, fontSize: 13, padding: '12px 28px', borderRadius: 10, cursor: 'pointer' }}>
                   Done
