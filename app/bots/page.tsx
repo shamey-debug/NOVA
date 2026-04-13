@@ -288,7 +288,6 @@ export default function BotsPage() {
                     🔒 {bot.tier.toUpperCase()}
                   </div>
                 )}
-                {/* Card header */}
                 <div style={{ padding: "18px 18px 12px", borderBottom: `1px solid ${G.border}` }}>
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "8px" }}>
                     <div>
@@ -309,7 +308,6 @@ export default function BotsPage() {
                   <p style={{ fontSize: "12px", color: G.sec, lineHeight: 1.55, margin: 0 }}>{bot.desc}</p>
                 </div>
 
-                {/* Mini chart */}
                 <div style={{ padding: "8px 0", background: "rgba(0,0,0,0.2)" }}>
                   <ResponsiveContainer width="100%" height={56}>
                     <AreaChart data={bot.data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
@@ -325,7 +323,6 @@ export default function BotsPage() {
                   </ResponsiveContainer>
                 </div>
 
-                {/* Stats row */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1px", background: G.border, borderTop: `1px solid ${G.border}`, borderBottom: `1px solid ${G.border}` }}>
                   {[["Win Rate", bot.winRate], ["Monthly", bot.monthly], ["Trades", bot.trades.toLocaleString()], ["Drawdown", bot.drawdown]].map(([l, v]) => (
                     <div key={String(l)} style={{ background: G.bg, padding: "8px 10px" }}>
@@ -335,13 +332,12 @@ export default function BotsPage() {
                   ))}
                 </div>
 
-                {/* Pair + actions */}
                 <div style={{ padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <span style={{ fontSize: "11px", color: G.muted }}>{bot.pair}</span>
                   <div style={{ display: "flex", gap: "8px" }}>
                     <button style={{ padding: "6px 14px", borderRadius: "7px", fontSize: "12px", border: `1px solid ${G.border}`, background: "transparent", color: G.sec, cursor: "pointer" }}>Details</button>
                     {locked ? (
-                      <button style={{ padding: "6px 14px", borderRadius: "7px", fontSize: "12px", fontWeight: 700, border: "none", background: G.goldDim, color: G.gold, cursor: "pointer", border2: `1px solid ${G.goldBorder}` as any }}>Unlock →</button>
+                      <button style={{ padding: "6px 14px", borderRadius: "7px", fontSize: "12px", fontWeight: 700, border: `1px solid ${G.goldBorder}`, background: G.goldDim, color: G.gold, cursor: "pointer" }}>Unlock →</button>
                     ) : (
                       <button style={{ padding: "6px 14px", borderRadius: "7px", fontSize: "12px", fontWeight: 700, border: "none", background: bot.active ? G.redBg : G.greenBg, color: bot.active ? G.redText : G.greenText, cursor: "pointer" }}>{bot.active ? "Stop" : "Start"}</button>
                     )}
