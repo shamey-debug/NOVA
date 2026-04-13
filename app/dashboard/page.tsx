@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { supabase } from '@/lib/supabase'
 
 const G = {
@@ -43,6 +43,13 @@ const BOTS = [
   { id: 'apex', name: 'Apex Momentum', risk: 'High', daily: 9.0, min: 85 },
 ]
 
+function validateAddress(address: string, network: 'BTC' | 'USDT') {
+  if (!address) return false
+  if (network === 'BTC') return /^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$|^bc1[a-z0-9]{39,59}$/.test(address)
+  if (network === 'USDT') return /^T[a-zA-Z0-9]{33}$/.test(address)
+  return false
+}
+
 export default function Dashboard() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
@@ -70,30 +77,33 @@ export default function Dashboard() {
   // Simulation
   const [simulatedPnl, setSimulatedPnl] = useState(0)
   const [pnlHistory, setPnlHistory] = useState<{ t: string; p: number }[]>([{ t: '0', p: 0 }])
+  const [targetReached, setTargetReached] = useState(false)
   const simulationRef = useRef<NodeJS.Timeout | null>(null)
 
   // Withdrawal modal
   const [showWithdrawModal, setShowWithdrawModal] = useState(false)
+  const [withdrawNetwork, setWithdrawNetwork] = useState<'BTC' | 'USDT'>('USDT')
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [withdrawAddress, setWithdrawAddress] = useState('')
   const [withdrawLoading, setWithdrawLoading] = useState(false)
   const [withdrawDone, setWithdrawDone] = useState(false)
+  const [addressError, setAddressError] = useState('')
+
+  const loadData = async (uid: string) => {
+    const { data: w } = await supabase.from('wallets').select('*').eq('user_id', uid).single()
+    setWallet(w)
+    const { data: s } = await supabase.from('bot_sessions').select('*').eq('user_id', uid).order('started_at', { ascending: false })
+    setSessions(s ?? [])
+    const { data: d } = await supabase.from('deposits').select('*').eq('user_id', uid).order('created_at', { ascending: false })
+    setDeposits(d ?? [])
+  }
 
   useEffect(() => {
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       setUser(user)
-
-      const { data: w } = await supabase.from('wallets').select('*').eq('user_id', user.id).single()
-      setWallet(w)
-
-      const { data: s } = await supabase.from('bot_sessions').select('*').eq('user_id', user.id).order('started_at', { ascending: false })
-      setSessions(s ?? [])
-
-      const { data: d } = await supabase.from('deposits').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
-      setDeposits(d ?? [])
-
+      await loadData(user.id)
       setLoading(false)
     }
     load()
@@ -105,6 +115,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!activeSession) return
+    setTargetReached(false)
 
     const target = activeSession.target_profit
     const stopLoss = activeSession.target_loss
@@ -123,9 +134,12 @@ export default function Dashboard() {
       current = Math.min(current, target)
 
       setSimulatedPnl(+current.toFixed(2))
-      setPnlHistory(prev => [...prev, { t: String(tick), p: +current.toFixed(2) }].slice(-60))
+      setPnlHistory(prev => [...prev, { t: String(tick), p: +current.toFixed(2) }].slice(-80))
 
-      if (current >= target && simulationRef.current) clearInterval(simulationRef.current)
+      if (current >= target && simulationRef.current) {
+        clearInterval(simulationRef.current)
+        setTargetReached(true)
+      }
     }, 1500)
 
     return () => { if (simulationRef.current) clearInterval(simulationRef.current) }
@@ -146,7 +160,7 @@ export default function Dashboard() {
     const tp = parseFloat(targetProfit)
     const tl = parseFloat(targetLoss)
     if (!amt || !tp || !tl) { setTradeError('Fill all fields.'); return }
-    if (amt > (wallet?.balance ?? 0)) { setTradeError('Insufficient wallet balance.'); return }
+    if (amt > balance) { setTradeError('Insufficient wallet balance.'); return }
     if (amt < selectedBot.min) { setTradeError(`Minimum is $${selectedBot.min}.`); return }
 
     setTradeLoading(true)
@@ -170,14 +184,25 @@ export default function Dashboard() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: user.id, amount: activeSession.amount + simulatedPnl }),
     })
-    window.location.reload()
+    if (keepTrading) {
+      setView('trade')
+      await loadData(user.id)
+    } else {
+      await loadData(user.id)
+      setSessions(prev => prev.map(s => s.id === activeSession.id ? { ...s, status: 'completed' } : s))
+    }
   }
 
   const handleWithdraw = async () => {
+    setAddressError('')
     if (!withdrawAmount || !withdrawAddress) return
     const amt = parseFloat(withdrawAmount)
     if (amt < 10) { alert('Minimum withdrawal is $10'); return }
     if (amt > balance) { alert('Insufficient balance'); return }
+    if (!validateAddress(withdrawAddress, withdrawNetwork)) {
+      setAddressError(`Invalid ${withdrawNetwork} address for ${withdrawNetwork === 'USDT' ? 'TRC20' : 'Bitcoin'} network`)
+      return
+    }
     setWithdrawLoading(true)
     await supabase.from('withdrawals').insert({
       user_id: user.id,
@@ -193,6 +218,8 @@ export default function Dashboard() {
     await supabase.auth.signOut()
     router.push('/login')
   }
+
+  const pnlPercent = activeSession ? Math.min(100, Math.max(0, simulatedPnl / activeSession.target_profit * 100)) : 0
 
   if (loading) return (
     <div style={{ height: '100vh', background: G.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: G.gold, fontSize: 14 }}>
@@ -266,92 +293,134 @@ export default function Dashboard() {
                 ))}
               </div>
 
-              {/* Portfolio chart */}
-              <div style={{ background: G.bg2, border: `1px solid ${G.border}`, borderRadius: 12, padding: 16 }}>
-                <div style={{ fontSize: 11, color: G.muted, marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Portfolio Curve</div>
-                <ResponsiveContainer width="100%" height={180}>
-                  <AreaChart data={chartData}>
-                    <defs>
-                      <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={G.gold} stopOpacity={0.18} />
-                        <stop offset="100%" stopColor={G.gold} stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <XAxis dataKey="t" hide />
-                    <YAxis hide domain={['auto', 'auto']} />
-                    <Tooltip contentStyle={{ background: '#111', border: `1px solid ${G.border}`, borderRadius: 8, fontSize: 11 }} formatter={(v: number) => [`$${v.toFixed(2)}`, 'Value']} labelFormatter={() => ''} />
-                    <Area type="monotone" dataKey="p" stroke={G.gold} strokeWidth={1.5} fill="url(#cg)" dot={false} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-
               {/* Active bot session */}
               {activeSession ? (
-                <div style={{ background: G.bg2, border: `1px solid ${G.goldBorder}`, borderRadius: 12, padding: 20 }}>
+                <div style={{ background: 'linear-gradient(135deg, rgba(245,197,24,0.04) 0%, rgba(74,222,128,0.04) 100%)', border: `1px solid ${targetReached ? G.greenText : G.goldBorder}`, borderRadius: 16, padding: 24, position: 'relative', overflow: 'hidden', transition: 'border-color 0.5s' }}>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                    <div style={{ fontSize: 11, color: G.gold, textTransform: 'uppercase', letterSpacing: '0.06em' }}>● Active Bot Session</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: G.greenText, boxShadow: `0 0 6px ${G.greenText}` }} />
-                      <span style={{ fontSize: 11, color: G.greenText, fontWeight: 700 }}>RUNNING</span>
+                  {/* Glow effect */}
+                  <div style={{ position: 'absolute', top: -60, right: -60, width: 200, height: 200, background: targetReached ? 'rgba(74,222,128,0.08)' : 'rgba(245,197,24,0.06)', borderRadius: '50%', filter: 'blur(40px)', pointerEvents: 'none' }} />
+
+                  {/* Header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: G.gold, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>⚡ Active Bot Session</div>
+                      <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em' }}>
+                        <span style={{ color: simulatedPnl >= 0 ? G.greenText : G.redText }}>
+                          {simulatedPnl >= 0 ? '+' : ''}${simulatedPnl.toFixed(2)}
+                        </span>
+                        <span style={{ fontSize: 13, color: G.muted, fontWeight: 400, marginLeft: 8 }}>current P&L</span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: G.greenBg, border: `1px solid ${G.green}`, borderRadius: 20, padding: '4px 12px' }}>
+                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: G.greenText, boxShadow: `0 0 8px ${G.greenText}` }} />
+                        <span style={{ fontSize: 11, color: G.greenText, fontWeight: 700, letterSpacing: '0.06em' }}>RUNNING</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: G.muted }}>Target: <span style={{ color: G.greenText, fontWeight: 700 }}>${activeSession.target_profit}</span></div>
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 16 }}>
+                  {/* Live P&L chart - dramatic */}
+                  <div style={{ background: 'rgba(0,0,0,0.4)', borderRadius: 12, padding: '12px 4px 4px', marginBottom: 16, position: 'relative' }}>
+                    {/* Current value label */}
+                    <div style={{ position: 'absolute', top: 8, left: 12, fontSize: 10, color: G.muted, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Live P&L</div>
+                    <ResponsiveContainer width="100%" height={160}>
+                      <AreaChart data={pnlHistory} margin={{ top: 20, right: 8, bottom: 0, left: 8 }}>
+                        <defs>
+                          <linearGradient id="pnlUp" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={G.greenText} stopOpacity={0.35} />
+                            <stop offset="60%" stopColor={G.greenText} stopOpacity={0.08} />
+                            <stop offset="100%" stopColor={G.greenText} stopOpacity={0} />
+                          </linearGradient>
+                          <linearGradient id="pnlDown" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={G.redText} stopOpacity={0.35} />
+                            <stop offset="100%" stopColor={G.redText} stopOpacity={0} />
+                          </linearGradient>
+                          <filter id="glow">
+                            <feGaussianBlur stdDeviation="2" result="coloredBlur" />
+                            <feMerge>
+                              <feMergeNode in="coloredBlur" />
+                              <feMergeNode in="SourceGraphic" />
+                            </feMerge>
+                          </filter>
+                        </defs>
+                        <XAxis dataKey="t" hide />
+                        <YAxis hide domain={['auto', 'auto']} />
+                        <Tooltip
+                          contentStyle={{ background: '#0a0a0a', border: `1px solid ${G.border}`, borderRadius: 8, fontSize: 11 }}
+                          formatter={(v: number) => [`${v >= 0 ? '+' : ''}$${v.toFixed(2)}`, 'P&L']}
+                          labelFormatter={() => ''}
+                        />
+                        <ReferenceLine y={0} stroke={G.border} strokeDasharray="3 3" />
+                        <Area
+                          type="monotoneX"
+                          dataKey="p"
+                          stroke={simulatedPnl >= 0 ? G.greenText : G.redText}
+                          strokeWidth={2.5}
+                          fill={simulatedPnl >= 0 ? 'url(#pnlUp)' : 'url(#pnlDown)'}
+                          dot={false}
+                          isAnimationActive={false}
+                          style={{ filter: 'url(#glow)' }}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Progress bar - dramatic */}
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ fontSize: 11, color: G.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Progress to target</span>
+                      <span style={{ fontSize: 13, color: G.gold, fontWeight: 800 }}>{pnlPercent.toFixed(1)}%</span>
+                    </div>
+                    <div style={{ height: 8, background: 'rgba(255,255,255,0.05)', borderRadius: 99, overflow: 'hidden', position: 'relative' }}>
+                      <div style={{
+                        height: '100%',
+                        width: `${pnlPercent}%`,
+                        background: `linear-gradient(90deg, ${G.gold} 0%, ${G.greenText} 100%)`,
+                        borderRadius: 99,
+                        transition: 'width 1.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                        boxShadow: `0 0 12px rgba(74,222,128,0.5)`,
+                        position: 'relative',
+                      }}>
+                        <div style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', width: 12, height: 12, borderRadius: '50%', background: G.greenText, boxShadow: `0 0 8px ${G.greenText}`, marginRight: -6 }} />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+                      <span style={{ fontSize: 10, color: G.muted }}>$0</span>
+                      <span style={{ fontSize: 10, color: G.greenText, fontWeight: 700 }}>+${activeSession.target_profit}</span>
+                    </div>
+                  </div>
+
+                  {/* Stats row */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
                     {[
-                      { label: 'Amount', value: `$${activeSession.amount}`, color: G.text },
-                      { label: 'Current P&L', value: `${simulatedPnl >= 0 ? '+' : ''}$${simulatedPnl}`, color: simulatedPnl >= 0 ? G.greenText : G.redText },
-                      { label: 'Target Profit', value: `$${activeSession.target_profit}`, color: G.greenText },
-                      { label: 'Stop Loss', value: `$${activeSession.target_loss}`, color: G.redText },
+                      { label: 'Traded', value: `$${activeSession.amount}`, color: G.text },
+                      { label: 'Stop Loss', value: `-$${activeSession.target_loss}`, color: G.redText },
+                      { label: 'Est. Return', value: `+${((activeSession.target_profit / activeSession.amount) * 100).toFixed(1)}%`, color: G.greenText },
                     ].map(s => (
-                      <div key={s.label} style={{ background: G.bg3, borderRadius: 10, padding: '12px 16px' }}>
-                        <div style={{ fontSize: 10, color: G.muted, marginBottom: 4 }}>{s.label}</div>
-                        <div style={{ fontSize: 20, fontWeight: 800, color: s.color, transition: 'color 0.3s' }}>{s.value}</div>
+                      <div key={s.label} style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 10, padding: '10px 14px', border: `1px solid ${G.border}` }}>
+                        <div style={{ fontSize: 10, color: G.muted, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</div>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: s.color }}>{s.value}</div>
                       </div>
                     ))}
                   </div>
 
-                  <div style={{ marginBottom: 16 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <span style={{ fontSize: 11, color: G.muted }}>Progress to target</span>
-                      <span style={{ fontSize: 11, color: G.gold, fontWeight: 700 }}>
-                        {Math.min(100, Math.max(0, simulatedPnl / activeSession.target_profit * 100)).toFixed(1)}%
-                      </span>
-                    </div>
-                    <div style={{ height: 6, background: G.bg3, borderRadius: 99, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${Math.min(100, Math.max(0, simulatedPnl / activeSession.target_profit * 100))}%`, background: `linear-gradient(90deg, ${G.gold}, ${G.greenText})`, borderRadius: 99, transition: 'width 1s ease' }} />
-                    </div>
-                  </div>
-
-                  <ResponsiveContainer width="100%" height={120}>
-                    <AreaChart data={pnlHistory}>
-                      <defs>
-                        <linearGradient id="pnlGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor={simulatedPnl >= 0 ? G.greenText : G.redText} stopOpacity={0.2} />
-                          <stop offset="100%" stopColor={simulatedPnl >= 0 ? G.greenText : G.redText} stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <XAxis dataKey="t" hide />
-                      <YAxis hide domain={['auto', 'auto']} />
-                      <Tooltip contentStyle={{ background: '#111', border: `1px solid ${G.border}`, borderRadius: 8, fontSize: 11 }} formatter={(v: number) => [`$${v.toFixed(2)}`, 'P&L']} labelFormatter={() => ''} />
-                      <Area type="monotone" dataKey="p" stroke={simulatedPnl >= 0 ? G.greenText : G.redText} strokeWidth={2} fill="url(#pnlGrad)" dot={false} isAnimationActive={false} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-
-                  {simulatedPnl >= activeSession.target_profit && (
-                    <div style={{ marginTop: 12, padding: 20, background: G.greenBg, border: `1px solid ${G.green}`, borderRadius: 12 }}>
-                      <div style={{ fontSize: 16, fontWeight: 800, color: G.greenText, marginBottom: 8 }}>🎯 Target Reached!</div>
-                      <div style={{ fontSize: 13, color: G.text, marginBottom: 16 }}>
-                        Your bot made <span style={{ color: G.greenText, fontWeight: 700 }}>+${simulatedPnl.toFixed(2)}</span> profit on a <span style={{ fontWeight: 700 }}>${activeSession.amount}</span> trade.{' '}
-                        Total to credit: <span style={{ color: G.gold, fontWeight: 700 }}>${(activeSession.amount + simulatedPnl).toFixed(2)}</span>
+                  {/* Target reached banner */}
+                  {targetReached && (
+                    <div style={{ marginTop: 16, padding: 20, background: 'linear-gradient(135deg, rgba(22,163,74,0.15), rgba(74,222,128,0.08))', border: `1px solid ${G.greenText}`, borderRadius: 12, boxShadow: `0 0 30px rgba(74,222,128,0.15)` }}>
+                      <div style={{ fontSize: 18, fontWeight: 900, color: G.greenText, marginBottom: 6 }}>🎯 Target Reached!</div>
+                      <div style={{ fontSize: 13, color: G.text, marginBottom: 16, lineHeight: 1.6 }}>
+                        Bot closed at <span style={{ color: G.greenText, fontWeight: 700 }}>+${simulatedPnl.toFixed(2)}</span> profit.{' '}
+                        Your wallet will be credited <span style={{ color: G.gold, fontWeight: 700 }}>${(activeSession.amount + simulatedPnl).toFixed(2)}</span>
+                        {' '}(capital + profit).
                       </div>
                       <div style={{ display: 'flex', gap: 10 }}>
                         <button onClick={() => handleCloseSession(false)}
-                          style={{ flex: 1, padding: 11, borderRadius: 8, background: G.greenBg, border: `1px solid ${G.green}`, color: G.greenText, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-                          ✅ Close & Collect
+                          style={{ flex: 1, padding: 12, borderRadius: 9, background: 'rgba(22,163,74,0.2)', border: `1px solid ${G.greenText}`, color: G.greenText, fontWeight: 800, fontSize: 13, cursor: 'pointer', letterSpacing: '0.02em' }}>
+                          ✅ Collect & Close
                         </button>
                         <button onClick={() => handleCloseSession(true)}
-                          style={{ flex: 1, padding: 11, borderRadius: 8, background: G.goldDim, border: `1px solid ${G.goldBorder}`, color: G.gold, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                          style={{ flex: 1, padding: 12, borderRadius: 9, background: G.goldDim, border: `1px solid ${G.goldBorder}`, color: G.gold, fontWeight: 800, fontSize: 13, cursor: 'pointer', letterSpacing: '0.02em' }}>
                           🔄 Trade Again
                         </button>
                       </div>
@@ -367,6 +436,25 @@ export default function Dashboard() {
                   </button>
                 </div>
               )}
+
+              {/* Portfolio chart */}
+              <div style={{ background: G.bg2, border: `1px solid ${G.border}`, borderRadius: 12, padding: 16 }}>
+                <div style={{ fontSize: 11, color: G.muted, marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Portfolio Curve</div>
+                <ResponsiveContainer width="100%" height={140}>
+                  <AreaChart data={chartData}>
+                    <defs>
+                      <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={G.gold} stopOpacity={0.18} />
+                        <stop offset="100%" stopColor={G.gold} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="t" hide />
+                    <YAxis hide domain={['auto', 'auto']} />
+                    <Tooltip contentStyle={{ background: '#111', border: `1px solid ${G.border}`, borderRadius: 8, fontSize: 11 }} formatter={(v: number) => [`$${v.toFixed(2)}`, 'Value']} labelFormatter={() => ''} />
+                    <Area type="monotone" dataKey="p" stroke={G.gold} strokeWidth={1.5} fill="url(#cg)" dot={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
 
               {/* Deposit history */}
               {deposits.length > 0 && (
@@ -527,37 +615,65 @@ export default function Dashboard() {
 
       {/* Withdraw Modal */}
       {showWithdrawModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
-          <div style={{ background: '#111', border: `1px solid ${G.border}`, borderRadius: 16, padding: 28, width: 420, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
+          <div style={{ background: '#0d0d0d', border: `1px solid ${G.border}`, borderRadius: 18, padding: 28, width: 440, display: 'flex', flexDirection: 'column', gap: 18 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: 16, fontWeight: 700 }}>Withdraw Funds</div>
-              <button onClick={() => { setShowWithdrawModal(false); setWithdrawDone(false); setWithdrawAmount(''); setWithdrawAddress('') }}
-                style={{ background: 'transparent', border: 'none', color: G.muted, cursor: 'pointer', fontSize: 18 }}>✕</button>
+              <div style={{ fontSize: 18, fontWeight: 800 }}>Withdraw Funds</div>
+              <button onClick={() => { setShowWithdrawModal(false); setWithdrawDone(false); setWithdrawAmount(''); setWithdrawAddress(''); setAddressError('') }}
+                style={{ background: 'transparent', border: 'none', color: G.muted, cursor: 'pointer', fontSize: 20 }}>✕</button>
             </div>
             {!withdrawDone ? (
               <>
-                <div style={{ fontSize: 13, color: G.muted }}>Available: <span style={{ color: G.gold, fontWeight: 700 }}>${balance.toFixed(2)}</span></div>
+                <div style={{ fontSize: 13, color: G.muted }}>Available balance: <span style={{ color: G.gold, fontWeight: 800, fontSize: 15 }}>${balance.toFixed(2)}</span></div>
+
+                {/* Network selector */}
+                <div>
+                  <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>Withdrawal Network</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    {(['BTC', 'USDT'] as const).map(n => (
+                      <button key={n} onClick={() => { setWithdrawNetwork(n); setWithdrawAddress(''); setAddressError('') }}
+                        style={{ padding: '12px', borderRadius: 8, border: `1px solid ${withdrawNetwork === n ? G.goldBorder : G.border}`, background: withdrawNetwork === n ? G.goldDim : 'transparent', color: withdrawNetwork === n ? G.gold : G.muted, fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
+                        {n === 'USDT' ? '₮ USDT TRC20' : '₿ Bitcoin'}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 11, color: G.sec, marginTop: 6 }}>
+                    {withdrawNetwork === 'USDT' ? '⚠ Only TRC20 (Tron) network supported' : '⚠ Bitcoin mainnet only'}
+                  </div>
+                </div>
+
                 <div>
                   <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>Amount (USD)</div>
                   <input type="number" placeholder="Min. $10" value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)}
                     style={{ width: '100%', background: G.bg3, border: `1px solid ${G.border}`, borderRadius: 8, padding: '12px 16px', fontSize: 13, color: G.text, outline: 'none', boxSizing: 'border-box' }} />
                 </div>
+
                 <div>
-                  <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>Your BTC or USDT (TRC20) Address</div>
-                  <input type="text" placeholder="Paste your wallet address" value={withdrawAddress} onChange={e => setWithdrawAddress(e.target.value)}
-                    style={{ width: '100%', background: G.bg3, border: `1px solid ${G.border}`, borderRadius: 8, padding: '12px 16px', fontSize: 13, color: G.text, outline: 'none', boxSizing: 'border-box' }} />
+                  <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>
+                    Your {withdrawNetwork === 'USDT' ? 'USDT TRC20' : 'Bitcoin'} Address
+                  </div>
+                  <input type="text"
+                    placeholder={withdrawNetwork === 'USDT' ? 'T... (TRC20 address)' : '1... or bc1... (BTC address)'}
+                    value={withdrawAddress}
+                    onChange={e => { setWithdrawAddress(e.target.value); setAddressError('') }}
+                    style={{ width: '100%', background: G.bg3, border: `1px solid ${addressError ? G.red : G.border}`, borderRadius: 8, padding: '12px 16px', fontSize: 12, color: G.text, outline: 'none', boxSizing: 'border-box', fontFamily: 'monospace' }} />
+                  {addressError && <div style={{ fontSize: 11, color: G.redText, marginTop: 6 }}>⚠ {addressError}</div>}
+                  {withdrawAddress && !addressError && validateAddress(withdrawAddress, withdrawNetwork) && (
+                    <div style={{ fontSize: 11, color: G.greenText, marginTop: 6 }}>✓ Valid {withdrawNetwork} address</div>
+                  )}
                 </div>
+
                 <button onClick={handleWithdraw} disabled={withdrawLoading}
                   style={{ background: G.gold, color: '#000', fontWeight: 800, fontSize: 14, padding: 14, borderRadius: 10, border: 'none', cursor: 'pointer', opacity: withdrawLoading ? 0.6 : 1 }}>
                   {withdrawLoading ? 'Submitting...' : 'Request Withdrawal →'}
                 </button>
-                <div style={{ fontSize: 11, color: G.muted, textAlign: 'center' }}>Withdrawals are processed within 24 hours</div>
+                <div style={{ fontSize: 11, color: G.muted, textAlign: 'center' }}>Processed within 24 hours · Minimum $10</div>
               </>
             ) : (
               <div style={{ textAlign: 'center', padding: 20 }}>
-                <div style={{ fontSize: 32, marginBottom: 12 }}>✅</div>
-                <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Withdrawal Requested</div>
-                <div style={{ fontSize: 13, color: G.muted, marginBottom: 20 }}>We will process your withdrawal within 24 hours.</div>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
+                <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>Withdrawal Requested</div>
+                <div style={{ fontSize: 13, color: G.muted, marginBottom: 20 }}>Your withdrawal will be processed within 24 hours to your {withdrawNetwork} address.</div>
                 <button onClick={() => { setShowWithdrawModal(false); setWithdrawDone(false); setWithdrawAmount(''); setWithdrawAddress('') }}
                   style={{ background: G.goldDim, color: G.gold, border: `1px solid ${G.goldBorder}`, fontWeight: 700, fontSize: 13, padding: '10px 24px', borderRadius: 8, cursor: 'pointer' }}>
                   Done
