@@ -219,7 +219,9 @@ export default function Dashboard() {
 
   const simRef      = useRef<NodeJS.Timeout | null>(null)
   const cdownRef    = useRef<NodeJS.Timeout | null>(null)
-  const pnlRef      = useRef(0)            // live pnl accessible in async handlers
+  const pnlRef           = useRef(0)
+  const activeSessionRef = useRef<any>(null)
+  const userRef          = useRef<any>(null)
 
   const [walletAddresses, setWalletAddresses] = useState<Record<string,'BTC'|'USDT'>>({ BTC: '', USDT: '' } as any)
   const [copiedAddr, setCopiedAddr] = useState(false)
@@ -304,6 +306,10 @@ export default function Dashboard() {
   const activeSession = sessions.find(s => s.status === 'active')
   const totalPnl      = sessions.reduce((acc, s) => acc + (s.current_pnl ?? 0), 0)
 
+  // Keep refs current so async effects always have live values
+  activeSessionRef.current = activeSession ?? null
+  userRef.current          = user
+
   useEffect(() => {
     if (!activeSession) return
     const stored = localStorage.getItem(`bot_type_${activeSession.id}`)
@@ -372,13 +378,34 @@ export default function Dashboard() {
     }
   }, [activeSession?.id, activeBotType])
 
-  // ── Auto-close when target reached ──
+  // ── Auto-collect when target reached ──
   useEffect(() => {
-    if (!targetReached || !activeSession) return
+    if (!targetReached) return
+    const session = activeSessionRef.current
+    const uid     = userRef.current
+    if (!session || !uid) return
     const pnl = pnlRef.current
-    closeSession(activeSession, pnl).then(() => {
-      addToast('success', '🎯 Target Reached!', `+$${pnl.toFixed(2)} profit credited to your wallet.`, '💰')
-    })
+
+    const collect = async () => {
+      // Stop session in DB
+      await fetch('/api/admin/stop-session', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: session.id }),
+      })
+      // Credit principal + profit
+      const creditRes = await fetch('/api/wallet/credit', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: uid.id, amount: session.amount + pnl }),
+      })
+      if (!creditRes.ok) {
+        addToast('error', 'Credit Failed', 'Could not credit wallet — tap Collect below.', '⚠️')
+        return
+      }
+      await loadData(uid.id)
+      setSessions(prev => prev.map(s => s.id === session.id ? { ...s, status: 'completed' } : s))
+      addToast('success', '🎯 Target Reached!', `+$${pnl.toFixed(2)} profit credited. New balance updated.`, '💰')
+    }
+    collect()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetReached])
 
@@ -755,16 +782,34 @@ export default function Dashboard() {
                     </div>
 
                     {targetReached && (
-                      <div style={{ marginTop: 14, padding: 18, background: 'linear-gradient(135deg,rgba(22,163,74,0.15),rgba(74,222,128,0.08))', border: `1px solid ${G.greenText}`, borderRadius: 12, boxShadow: '0 0 30px rgba(74,222,128,0.12)', animation: 'fadeUp 0.4s ease', display: 'flex', alignItems: 'center', gap: 14 }}>
-                        <div style={{ fontSize: 28, flexShrink: 0 }}>🎯</div>
-                        <div>
-                          <div style={{ fontSize: 15, fontWeight: 900, color: G.greenText, marginBottom: 4 }}>Target Reached — Crediting…</div>
-                          <div style={{ fontSize: 12, color: G.text, lineHeight: 1.6 }}>
-                            Profit: <span style={{ color: G.greenText, fontWeight: 700 }}>+${simulatedPnl.toFixed(2)}</span>
-                            {' · '}Total: <span style={{ color: G.gold, fontWeight: 700 }}>${(activeSession.amount + simulatedPnl).toFixed(2)}</span>
+                      <div style={{ marginTop: 14, padding: 18, background: 'linear-gradient(135deg,rgba(22,163,74,0.15),rgba(74,222,128,0.08))', border: `1px solid ${G.greenText}`, borderRadius: 12, boxShadow: '0 0 30px rgba(74,222,128,0.12)', animation: 'fadeUp 0.4s ease', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                          <div style={{ fontSize: 28, flexShrink: 0 }}>🎯</div>
+                          <div>
+                            <div style={{ fontSize: 15, fontWeight: 900, color: G.greenText, marginBottom: 4 }}>Target Reached!</div>
+                            <div style={{ fontSize: 12, color: G.text, lineHeight: 1.6 }}>
+                              Profit: <span style={{ color: G.greenText, fontWeight: 700 }}>+${simulatedPnl.toFixed(2)}</span>
+                              {' · '}Total credited: <span style={{ color: G.gold, fontWeight: 700 }}>${(activeSession.amount + simulatedPnl).toFixed(2)}</span>
+                            </div>
+                            <div style={{ fontSize: 11, color: G.muted, marginTop: 3 }}>Balance updating automatically…</div>
                           </div>
-                          <div style={{ fontSize: 11, color: G.muted, marginTop: 3 }}>Balance is updating automatically…</div>
                         </div>
+                        {/* Fallback manual collect — fires if auto-collect missed */}
+                        <button
+                          onClick={async () => {
+                            const session = activeSessionRef.current
+                            const uid     = userRef.current
+                            if (!session || !uid) return
+                            const pnl = pnlRef.current
+                            await fetch('/api/admin/stop-session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: session.id }) })
+                            await fetch('/api/wallet/credit',      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: uid.id, amount: session.amount + pnl }) })
+                            await loadData(uid.id)
+                            setSessions(prev => prev.map(s => s.id === session.id ? { ...s, status: 'completed' } : s))
+                            addToast('success', 'Profit Collected', `$${(session.amount + pnl).toFixed(2)} added to wallet.`, '💰')
+                          }}
+                          style={{ width: '100%', padding: '13px 0', borderRadius: 10, background: 'linear-gradient(90deg,#16a34a,#22c55e)', border: 'none', color: '#000', fontWeight: 900, fontSize: 15, cursor: 'pointer', letterSpacing: '0.02em' }}>
+                          💰 Collect ${(activeSession.amount + simulatedPnl).toFixed(2)}
+                        </button>
                       </div>
                     )}
                   </div>
