@@ -372,6 +372,16 @@ export default function Dashboard() {
     }
   }, [activeSession?.id, activeBotType])
 
+  // ── Auto-close when target reached ──
+  useEffect(() => {
+    if (!targetReached || !activeSession) return
+    const pnl = pnlRef.current
+    closeSession(activeSession, pnl).then(() => {
+      addToast('success', '🎯 Target Reached!', `+$${pnl.toFixed(2)} profit credited to your wallet.`, '💰')
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetReached])
+
   useEffect(() => {
     const amt = parseFloat(tradeAmount)
     if (!amt || isNaN(amt)) { setTargetProfit(''); return }
@@ -745,21 +755,15 @@ export default function Dashboard() {
                     </div>
 
                     {targetReached && (
-                      <div style={{ marginTop: 14, padding: 18, background: 'linear-gradient(135deg,rgba(22,163,74,0.15),rgba(74,222,128,0.08))', border: `1px solid ${G.greenText}`, borderRadius: 12, boxShadow: '0 0 30px rgba(74,222,128,0.12)', animation: 'fadeUp 0.4s ease' }}>
-                        <div style={{ fontSize: 18, fontWeight: 900, color: G.greenText, marginBottom: 6 }}>🎯 Target Reached!</div>
-                        <div style={{ fontSize: 13, color: G.text, marginBottom: 14, lineHeight: 1.6 }}>
-                          Profit: <span style={{ color: G.greenText, fontWeight: 700 }}>+${simulatedPnl.toFixed(2)}</span> · Total credit:{' '}
-                          <span style={{ color: G.gold, fontWeight: 700 }}>${(activeSession.amount + simulatedPnl).toFixed(2)}</span>
-                        </div>
-                        <div style={{ display: 'flex', gap: 10 }}>
-                          <button onClick={handleCloseSession}
-                            style={{ flex: 1, padding: 13, borderRadius: 10, background: 'rgba(22,163,74,0.2)', border: `1px solid ${G.greenText}`, color: G.greenText, fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
-                            ✅ Collect & Close
-                          </button>
-                          <button onClick={handleCloseSession}
-                            style={{ flex: 1, padding: 13, borderRadius: 10, background: G.goldDim, border: `1px solid ${G.goldBorder}`, color: G.gold, fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
-                            🔄 Trade Again
-                          </button>
+                      <div style={{ marginTop: 14, padding: 18, background: 'linear-gradient(135deg,rgba(22,163,74,0.15),rgba(74,222,128,0.08))', border: `1px solid ${G.greenText}`, borderRadius: 12, boxShadow: '0 0 30px rgba(74,222,128,0.12)', animation: 'fadeUp 0.4s ease', display: 'flex', alignItems: 'center', gap: 14 }}>
+                        <div style={{ fontSize: 28, flexShrink: 0 }}>🎯</div>
+                        <div>
+                          <div style={{ fontSize: 15, fontWeight: 900, color: G.greenText, marginBottom: 4 }}>Target Reached — Crediting…</div>
+                          <div style={{ fontSize: 12, color: G.text, lineHeight: 1.6 }}>
+                            Profit: <span style={{ color: G.greenText, fontWeight: 700 }}>+${simulatedPnl.toFixed(2)}</span>
+                            {' · '}Total: <span style={{ color: G.gold, fontWeight: 700 }}>${(activeSession.amount + simulatedPnl).toFixed(2)}</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: G.muted, marginTop: 3 }}>Balance is updating automatically…</div>
                         </div>
                       </div>
                     )}
