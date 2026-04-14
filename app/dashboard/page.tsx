@@ -40,7 +40,7 @@ const BOTS = [
     tag: '60 SEC',
     duration: 60,
     returnRate: 1.5,           // 150%
-    min: 85,
+    min: 50,
     max: 499,
     color: '#4ade80',
     colorDim: 'rgba(74,222,128,0.10)',
@@ -380,7 +380,7 @@ export default function Dashboard() {
 
   const handleDeposit = async () => {
     const amt = parseFloat(depositAmount)
-    if (!amt || amt < 85) { alert('Minimum deposit is $85'); return }
+    if (!amt || amt < 50) { alert('Minimum deposit is $50'); return }
     setDepositLoading(true)
     await supabase.from('deposits').insert({ user_id: user.id, currency, amount: amt })
     setDepositLoading(false)
@@ -839,7 +839,7 @@ export default function Dashboard() {
                               {balance === 0 ? 'Fund your account to trade' : `Need $${(selectedBot.min - balance).toFixed(2)} more to run ${selectedBot.name}`}
                             </div>
                             <div style={{ fontSize: 11, color: G.muted, marginTop: 2 }}>
-                              Minimum deposit $85 · Min trade ${selectedBot.min}
+                              Minimum deposit $50 · Min trade \${selectedBot.min}
                             </div>
                           </div>
                         </div>
@@ -917,7 +917,7 @@ export default function Dashboard() {
                 <div style={{ background: G.bg2, border: `1px solid ${G.border}`, borderRadius: 16, padding: isMobile ? 20 : 28, display: 'flex', flexDirection: 'column', gap: 20 }}>
                   <div>
                     <div style={{ fontSize: 18, fontWeight: 700 }}>Fund Your Wallet</div>
-                    <div style={{ fontSize: 13, color: G.muted, marginTop: 4 }}>Minimum deposit: $85 · Fee: $1</div>
+                    <div style={{ fontSize: 13, color: G.muted, marginTop: 4 }}>Minimum deposit: $50 · Fee: $1</div>
                   </div>
                   {!depositDone ? (
                     <>
@@ -954,9 +954,9 @@ export default function Dashboard() {
                       </div>
                       <div>
                         <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>Amount (USD equivalent)</div>
-                        <input type="number" placeholder="Min. $85" value={depositAmount} onChange={e => setDepositAmount(e.target.value)}
+                        <input type="number" placeholder="Min. $50" value={depositAmount} onChange={e => setDepositAmount(e.target.value)}
                           style={{ width: '100%', background: G.bg3, border: `1px solid ${G.border}`, borderRadius: 10, padding: '14px 16px', fontSize: 16, color: G.text, outline: 'none' }} />
-                        {depositAmount && parseFloat(depositAmount) >= 85 && (
+                        {depositAmount && parseFloat(depositAmount) >= 50 && (
                           <div style={{ fontSize: 12, color: G.greenText, marginTop: 6 }}>
                             Credited: <strong>${(parseFloat(depositAmount) - 1).toFixed(2)}</strong> after $1 fee
                           </div>
