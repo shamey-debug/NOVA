@@ -40,7 +40,7 @@ const BOTS = [
     tag: '60 SEC',
     duration: 60,
     returnRate: 1.5,           // 150%
-    min: 50,
+    min: 85,
     max: 499,
     color: '#4ade80',
     colorDim: 'rgba(74,222,128,0.10)',
@@ -78,10 +78,8 @@ const TICKERS_BASE = [
   { sym: 'MATIC', price: 0.78,   change: -0.88 },
 ]
 
-const WALLET_ADDRESSES: Record<string, string> = {
-  BTC:  '1A1zP1eP5QGefi2DMPTfTL5SLmv7Divf',
-  USDT: 'TN3W4xx8BdkJ3DxBZMB5MjY3Q5S7JB7mZ',
-}
+// Populated at runtime from Supabase app_config table
+const DEFAULT_WALLET_ADDRESSES: Record<string, string> = { BTC: '', USDT: '' }
 
 function validateAddress(address: string, network: 'BTC' | 'USDT') {
   if (!address) return false
@@ -223,6 +221,9 @@ export default function Dashboard() {
   const cdownRef    = useRef<NodeJS.Timeout | null>(null)
   const pnlRef      = useRef(0)            // live pnl accessible in async handlers
 
+  const [walletAddresses, setWalletAddresses] = useState<Record<string,'BTC'|'USDT'>>({ BTC: '', USDT: '' } as any)
+  const [copiedAddr, setCopiedAddr] = useState(false)
+
   const [showWithdrawModal, setShowWithdrawModal] = useState(false)
   const [withdrawNetwork,   setWithdrawNetwork]   = useState<'BTC' | 'USDT'>('USDT')
   const [withdrawAmount,    setWithdrawAmount]     = useState('')
@@ -275,12 +276,25 @@ export default function Dashboard() {
     setDeposits(d ?? [])
   }
 
+  const loadAddresses = async () => {
+    const { data } = await supabase.from('app_config').select('key, value').in('key', ['wallet_btc', 'wallet_usdt'])
+    if (data) {
+      const map: Record<string, string> = {}
+      data.forEach((row: any) => {
+        if (row.key === 'wallet_btc')  map['BTC']  = row.value
+        if (row.key === 'wallet_usdt') map['USDT'] = row.value
+      })
+      setWalletAddresses(map as any)
+    }
+  }
+
   useEffect(() => {
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       setUser(user)
       await loadData(user.id)
+      await loadAddresses()
       setLoading(false)
     }
     load()
@@ -779,24 +793,7 @@ export default function Dashboard() {
                         disabled={!canTrade}
                         style={{ width: '100%', background: canTrade ? G.bg3 : 'rgba(255,255,255,0.02)', border: `1px solid ${G.border}`, borderRadius: 10, padding: '14px 16px', fontSize: 16, color: canTrade ? G.text : G.muted, outline: 'none', cursor: canTrade ? 'text' : 'not-allowed' }}
                       />
-                      <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-                        {[50, 100, 200, 500, 1000]
-                          .filter(v => v >= selectedBot.min)
-                          .map(v => (
-                            <button key={v}
-                              onClick={() => canTrade && setTradeAmount(String(v))}
-                              disabled={!canTrade || v > balance}
-                              style={{ padding: '6px 14px', borderRadius: 7, background: parseFloat(tradeAmount) === v ? selectedBot.colorDim : G.bg3, border: `1px solid ${parseFloat(tradeAmount) === v ? selectedBot.colorBorder : G.border}`, color: parseFloat(tradeAmount) === v ? selectedBot.color : (v > balance ? G.muted + '55' : G.muted), fontSize: 12, fontWeight: 700, cursor: canTrade && v <= balance ? 'pointer' : 'not-allowed', opacity: v > balance ? 0.4 : 1 }}>
-                              ${v}
-                            </button>
-                          ))}
-                        <button
-                          onClick={() => canTrade && setTradeAmount(String(Math.min(Math.floor(balance), selectedBot.max)))}
-                          disabled={!canTrade}
-                          style={{ padding: '6px 14px', borderRadius: 7, background: G.bg3, border: `1px solid ${G.border}`, color: G.muted, fontSize: 12, fontWeight: 700, cursor: canTrade ? 'pointer' : 'not-allowed', opacity: canTrade ? 1 : 0.4 }}>
-                          MAX
-                        </button>
-                      </div>
+
                     </div>
 
                     {tradeAmount && parseFloat(tradeAmount) >= selectedBot.min && canTrade && (
@@ -935,8 +932,21 @@ export default function Dashboard() {
                         <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>
                           Send <span style={{ color: G.text, fontWeight: 700 }}>{currency === 'USDT' ? 'USDT (TRC20)' : 'Bitcoin'}</span> to this address
                         </div>
-                        <div style={{ background: G.bg3, border: `1px solid ${G.goldBorder}`, borderRadius: 10, padding: '14px 16px', fontSize: 11, color: G.gold, wordBreak: 'break-all', letterSpacing: '0.04em', fontFamily: 'monospace' }}>
-                          {WALLET_ADDRESSES[currency]}
+                        <div style={{ position: 'relative' }}>
+                          <div style={{ background: G.bg3, border: `1px solid ${G.goldBorder}`, borderRadius: 10, padding: '14px 48px 14px 16px', fontSize: 11, color: walletAddresses[currency] ? G.gold : G.muted, wordBreak: 'break-all', letterSpacing: '0.04em', fontFamily: 'monospace', minHeight: 46 }}>
+                            {walletAddresses[currency] || 'Address not configured yet'}
+                          </div>
+                          {walletAddresses[currency] && (
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(walletAddresses[currency])
+                                setCopiedAddr(true)
+                                setTimeout(() => setCopiedAddr(false), 2000)
+                              }}
+                              style={{ position: 'absolute', top: '50%', right: 10, transform: 'translateY(-50%)', background: copiedAddr ? G.greenBg : G.bg2, border: `1px solid ${copiedAddr ? G.greenText : G.border}`, borderRadius: 7, padding: '5px 10px', fontSize: 10, fontWeight: 700, color: copiedAddr ? G.greenText : G.muted, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                              {copiedAddr ? '✓ Copied' : '⎘ Copy'}
+                            </button>
+                          )}
                         </div>
                         <div style={{ fontSize: 11, color: G.muted, marginTop: 6 }}>
                           {currency === 'USDT' ? '⚠ Only send USDT on TRC20 (Tron) — not ERC20' : '⚠ Bitcoin mainnet only'}
