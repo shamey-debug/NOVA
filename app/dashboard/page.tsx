@@ -459,19 +459,25 @@ export default function Dashboard() {
     await loadData(user.id)
   }
 
-  // ── Close / collect session ──
-  const closeSession = async (session: any, currentPnl: number) => {
+ const closeSession = async (session: any, currentPnl: number) => {
     if (simRef.current)   clearInterval(simRef.current)
     if (cdownRef.current) clearInterval(cdownRef.current)
-    await fetch('/api/admin/stop-session', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: session.id }),
+
+    const uid = userRef.current ?? user
+    const res = await fetch('/api/wallet/collect-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: session.id, userId: uid.id, pnl: currentPnl }),
     })
-    await fetch('/api/wallet/credit', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: user.id, amount: session.amount + currentPnl }),
-    })
-    await loadData(user.id)
+
+    const data = await res.json()
+    if (!res.ok) {
+      console.error('collect-session failed:', data)
+      addToast('error', 'Credit Failed', data.error ?? 'Could not credit wallet.', '⚠️')
+      return
+    }
+
+    await loadData(uid.id)
     setSessions(prev => prev.map(s => s.id === session.id ? { ...s, status: 'completed' } : s))
   }
 
