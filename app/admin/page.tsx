@@ -123,7 +123,7 @@ export default function AdminPage() {
     <div style={{ minHeight: '100vh', background: G.bg, color: G.text, fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif", padding: 24 }}>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <div style={{ fontSize: 20, fontWeight: 800, color: G.gold, letterSpacing: '0.06em' }}>⚡ NOVA ADMIN</div>
+        <div style={{ fontSize: 20, fontWeight: 800, color: G.gold, letterSpacing: '0.06em' }}>⚡ KoolCrypto ADMIN</div>
         <button onClick={() => router.push('/dashboard')}
           style={{ fontSize: 12, color: G.muted, background: G.bg2, border: `1px solid ${G.border}`, padding: '6px 16px', borderRadius: 8, cursor: 'pointer' }}>
           ← Dashboard

@@ -40,7 +40,7 @@ export default function LoginPage() {
         <div>
           <h1 className="text-3xl font-bold">Welcome back.</h1>
           <p className="text-zinc-400 mt-2 text-sm">
-            Log in to your Nova account.
+            Log in to your KoolCrypto account.
           </p>
         </div>
 

@@ -1,4 +1,4 @@
-// File: C:\Users\hp\Desktop\nova\app\admin\page.tsx
+// File: C:\Users\hp\Desktop\KoolCrypto\app\admin\page.tsx
 import * as entry from '../../../../app/admin/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

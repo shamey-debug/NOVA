@@ -1,4 +1,4 @@
-// File: C:\Users\hp\Desktop\nova\app\api\wallet\deduct\route.ts
+// File: C:\Users\hp\Desktop\KoolCrypto\app\api\wallet\deduct\route.ts
 import * as entry from '../../../../../../app/api/wallet/deduct/route.js'
 import type { NextRequest } from 'next/server.js'
 

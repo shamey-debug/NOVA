@@ -1,4 +1,4 @@
-// File: C:\Users\hp\Desktop\nova\app\api\admin\data\route.ts
+// File: C:\Users\hp\Desktop\KoolCrypto\app\api\admin\data\route.ts
 import * as entry from '../../../../../../app/api/admin/data/route.js'
 import type { NextRequest } from 'next/server.js'
 

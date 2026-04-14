@@ -102,7 +102,7 @@ const TESTIMONIALS = [
     handle: '@marco_fx',
     flag: '🇮🇹',
     avatar: 'MV',
-    text: 'I\'ve tried four other platforms. Nova is the only one where the bot actually executes fast enough to matter. Up €2,900 in six weeks and counting.',
+    text: 'I\'ve tried four other platforms. KoolCrypto is the only one where the bot actually executes fast enough to matter. Up €2,900 in six weeks and counting.',
     profit: '+$3,200',
     days: '42 days',
   },
@@ -120,7 +120,7 @@ const TESTIMONIALS = [
     handle: '@omar_invest',
     flag: '🇦🇪',
     avatar: 'OA',
-    text: 'Running $1,000 sessions consistently now. Withdrawals are always processed same day. Nova fits perfectly into my portfolio strategy alongside equities.',
+    text: 'Running $1,000 sessions consistently now. Withdrawals are always processed same day. KoolCrypto fits perfectly into my portfolio strategy alongside equities.',
     profit: '+$2,400',
     days: '30 days',
   },
@@ -165,7 +165,7 @@ const TESTIMONIALS = [
     handle: '@hanam_uae',
     flag: '🇦🇪',
     avatar: 'HM',
-    text: 'Security was my biggest concern and Nova addressed it fully — 2FA, non-custodial, instant withdrawals. Made $2,750 last month with zero stress.',
+    text: 'Security was my biggest concern and KoolCrypto addressed it fully — 2FA, non-custodial, instant withdrawals. Made $2,750 last month with zero stress.',
     profit: '+$2,750',
     days: '35 days',
   },
@@ -287,7 +287,7 @@ function CashoutBanner() {
           </div>
           <div style={{
             width: 8, height: 8, borderRadius: '50%', background: '#4ade80',
-            flexShrink: 0, animation: 'novaPulse 1.5s infinite',
+            flexShrink: 0, animation: 'KoolCryptoPulse 1.5s infinite',
           }} />
         </div>
       </div>
@@ -326,7 +326,7 @@ function Testimonials() {
           Real people. Real profits.
         </h2>
         <p style={{ fontSize: 13, color: G.sec, maxWidth: 360, margin: '0 auto' }}>
-          Join thousands of traders already cashing out with Nova bots.
+          Join thousands of traders already cashing out with KoolCrypto bots.
         </p>
       </div>
 
@@ -489,17 +489,17 @@ export default function HomePage() {
 
       {/* Keyframe injection */}
       <style>{`
-        @keyframes novaPulse {
+        @keyframes KoolCryptoPulse {
           0%, 100% { opacity: 1; transform: scale(1); }
           50% { opacity: 0.4; transform: scale(0.7); }
         }
-        .nova-hide-scrollbar::-webkit-scrollbar { display: none; }
+        .KoolCrypto-hide-scrollbar::-webkit-scrollbar { display: none; }
         @media (min-width: 768px) {
-          .nova-mobile-only { display: none !important; }
-          .nova-desktop-nav { display: flex !important; }
+          .KoolCrypto-mobile-only { display: none !important; }
+          .KoolCrypto-desktop-nav { display: flex !important; }
         }
         @media (max-width: 767px) {
-          .nova-desktop-nav { display: none !important; }
+          .KoolCrypto-desktop-nav { display: none !important; }
         }
       `}</style>
 
@@ -532,11 +532,11 @@ export default function HomePage() {
             border: `1px solid ${G.goldBorder}`, borderRadius: 8,
             display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15,
           }}>⚡</div>
-          <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: '0.14em', color: G.gold }}>NOVA</span>
+          <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: '0.14em', color: G.gold }}>KoolCrypto</span>
         </div>
 
         {/* Desktop nav */}
-        <div className="nova-desktop-nav" style={{ gap: 4, alignItems: 'center' }}>
+        <div className="KoolCrypto-desktop-nav" style={{ gap: 4, alignItems: 'center' }}>
           <button onClick={() => router.push('/login')}
             style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, border: `1px solid ${G.border}`, background: 'transparent', color: G.sec, cursor: 'pointer' }}>
             Log In
@@ -548,7 +548,7 @@ export default function HomePage() {
         </div>
 
         {/* Mobile hamburger */}
-        <button className="nova-mobile-only" onClick={() => setMenuOpen(!menuOpen)}
+        <button className="KoolCrypto-mobile-only" onClick={() => setMenuOpen(!menuOpen)}
           style={{ background: 'transparent', border: 'none', color: G.text, fontSize: 22, cursor: 'pointer', padding: 4 }}>
           {menuOpen ? '✕' : '☰'}
         </button>
@@ -741,7 +741,7 @@ export default function HomePage() {
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         flexWrap: 'wrap', gap: 12,
       }}>
-        <span style={{ fontSize: 12, color: G.muted }}>⚡ NOVA · AI Trading Platform</span>
+        <span style={{ fontSize: 12, color: G.muted }}>⚡ KoolCrypto · AI Trading Platform</span>
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
          {[['Sign Up', '/signup'], ['Log In', '/login']].map(([l, h]) => (
             <button key={l} onClick={() => router.push(h)}

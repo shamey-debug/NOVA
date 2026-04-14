@@ -38,7 +38,7 @@ const gen = (n = 30, up = true) => {
 
 const BOTS = [
   {
-    name: "NOVA Alpha",
+    name: "KoolCrypto Alpha",
     tag: "AI Signal",
     desc: "GPT-powered market sentiment + on-chain signal bot. Trades BTC/ETH on 4H timeframes.",
     pair: "BTC/USDT",
@@ -184,7 +184,7 @@ const PLANS = [
 ];
 
 const LEADERBOARD = [
-  { rank: 1, name: "NOVA Alpha", roi: "+84.2%", users: "4,821", type: "AI Signal" },
+  { rank: 1, name: "KoolCrypto Alpha", roi: "+84.2%", users: "4,821", type: "AI Signal" },
   { rank: 2, name: "Momentum Scalper", roi: "+102.4%", users: "2,140", type: "Scalping" },
   { rank: 3, name: "Grid Master Pro", roi: "+61.8%", users: "8,322", type: "Grid" },
   { rank: 4, name: "Arbitrage Hunter", roi: "+38.9%", users: "1,204", type: "Arbitrage" },
@@ -220,7 +220,7 @@ export default function BotsPage() {
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <div style={{ width: "34px", height: "34px", background: G.goldDim, border: `1px solid ${G.goldBorder}`, borderRadius: "9px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px" }}>⚡</div>
           <div>
-            <div style={{ fontSize: "16px", fontWeight: 800, letterSpacing: "0.16em", color: G.gold }}>NOVA</div>
+            <div style={{ fontSize: "16px", fontWeight: 800, letterSpacing: "0.16em", color: G.gold }}>KoolCrypto</div>
             <div style={{ fontSize: "9px", letterSpacing: "0.22em", color: G.muted, textTransform: "uppercase" }}>AI Bots</div>
           </div>
         </div>
@@ -243,7 +243,7 @@ export default function BotsPage() {
           <div style={{ position: "relative", zIndex: 1 }}>
             <div style={{ fontSize: "11px", color: G.gold, letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: "12px" }}>🤖 Automated Trading</div>
             <h1 style={{ fontSize: "36px", fontWeight: 900, letterSpacing: "-0.03em", margin: "0 0 10px" }}>Let AI trade while you sleep.</h1>
-            <p style={{ fontSize: "14px", color: G.sec, margin: "0 0 28px", maxWidth: "480px", lineHeight: 1.65 }}>Deploy battle-tested AI strategies in one click. Our bots run 24/7, execute in under 5ms, and have generated over $48M in profit for NOVA traders.</p>
+            <p style={{ fontSize: "14px", color: G.sec, margin: "0 0 28px", maxWidth: "480px", lineHeight: 1.65 }}>Deploy battle-tested AI strategies in one click. Our bots run 24/7, execute in under 5ms, and have generated over $48M in profit for KoolCrypto traders.</p>
             <div style={{ display: "flex", gap: "32px" }}>
               {[["$48M+", "Profit generated"], ["12,400+", "Active bots"], ["+84.2%", "Top bot ROI (12M)"], ["91%", "Best win rate"]].map(([v, l]) => (
                 <div key={l}>
