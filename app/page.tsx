@@ -573,14 +573,7 @@ export default function HomePage() {
             style={{ padding: 16, borderRadius: 10, fontSize: 16, border: `1px solid ${G.border}`, background: 'transparent', color: G.text, cursor: 'pointer' }}>
             Dashboard
           </button>
-          <div style={{ borderTop: `1px solid ${G.border}`, paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {['Pricing', 'Bots'].map(l => (
-              <button key={l} onClick={() => { router.push(`/${l.toLowerCase()}`); setMenuOpen(false) }}
-                style={{ padding: '12px 0', background: 'transparent', border: 'none', color: G.sec, fontSize: 15, textAlign: 'left', cursor: 'pointer' }}>
-                {l}
-              </button>
-            ))}
-          </div>
+          
         </div>
       )}
 
