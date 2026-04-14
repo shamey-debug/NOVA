@@ -550,7 +550,7 @@ export default function Dashboard() {
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              {balance > 0 && view === 'home' && (
+              {view === 'home' && (
                 <button onClick={() => setShowWithdrawModal(true)}
                   style={{ padding: '5px 12px', borderRadius: 7, background: G.bg3, border: `1px solid ${G.border}`, color: G.text, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
                   💸 {!isMobile && 'Withdraw'}
