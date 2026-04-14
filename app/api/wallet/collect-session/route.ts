@@ -2,62 +2,69 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-server'
 
 export async function POST(req: Request) {
-  const { sessionId, userId, pnl } = await req.json()
+  try {
+    const { sessionId, userId, pnl } = await req.json()
 
-  if (!sessionId || !userId || pnl === undefined) {
-    return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+    console.log('collect-session called:', { sessionId, userId, pnl })
+
+    if (!sessionId || !userId || pnl === undefined) {
+      console.log('Missing fields')
+      return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+    }
+
+    // Get session
+    const { data: session, error: sessionError } = await supabaseAdmin
+      .from('bot_sessions')
+      .select('amount')
+      .eq('id', sessionId)
+      .single()
+
+    console.log('session:', session, 'sessionError:', sessionError)
+
+    if (!session) {
+      return NextResponse.json({ error: 'Session not found: ' + sessionError?.message }, { status: 404 })
+    }
+
+    // Get wallet
+    const { data: wallet, error: walletFetchError } = await supabaseAdmin
+      .from('wallets')
+      .select('balance')
+      .eq('user_id', userId)
+      .single()
+
+    console.log('wallet:', wallet, 'walletFetchError:', walletFetchError)
+
+    if (!wallet) {
+      return NextResponse.json({ error: 'Wallet not found: ' + walletFetchError?.message }, { status: 404 })
+    }
+
+    const payout     = session.amount + pnl
+    const newBalance = wallet.balance + payout
+
+    console.log('crediting:', { payout, newBalance })
+
+    // Update wallet
+    const { error: walletError } = await supabaseAdmin
+      .from('wallets')
+      .update({ balance: newBalance })
+      .eq('user_id', userId)
+
+    if (walletError) {
+      console.log('wallet update error:', walletError)
+      return NextResponse.json({ error: walletError.message }, { status: 500 })
+    }
+
+    // Close session
+    await supabaseAdmin
+      .from('bot_sessions')
+      .update({ status: 'completed', ended_at: new Date().toISOString(), current_pnl: pnl })
+      .eq('id', sessionId)
+
+    console.log('collect-session success:', { newBalance, payout })
+    return NextResponse.json({ ok: true, newBalance, payout })
+
+  } catch (err: any) {
+    console.error('collect-session exception:', err)
+    return NextResponse.json({ error: err.message ?? 'Unknown error' }, { status: 500 })
   }
-
-  // Get session — no status filter, just find it
-  const { data: session } = await supabaseAdmin
-    .from('bot_sessions')
-    .select('*')
-    .eq('id', sessionId)
-    .single()
-
-  if (!session) {
-    return NextResponse.json({ error: 'Session not found' }, { status: 404 })
-  }
-
-  // Get wallet
-  const { data: wallet } = await supabaseAdmin
-    .from('wallets')
-    .select('balance')
-    .eq('user_id', userId)
-    .single()
-
-  if (!wallet) {
-    return NextResponse.json({ error: 'Wallet not found' }, { status: 404 })
-  }
-
-  // Prevent double-credit: if already completed and credited, skip
-  if (session.status === 'completed' && session.credited === true) {
-    return NextResponse.json({ ok: true, skipped: true, newBalance: wallet.balance })
-  }
-
-  const payout     = session.amount + pnl
-  const newBalance = wallet.balance + payout
-
-  // Credit wallet
-  const { error: walletError } = await supabaseAdmin
-    .from('wallets')
-    .update({ balance: newBalance })
-    .eq('user_id', userId)
-
-  if (walletError) {
-    return NextResponse.json({ error: 'Wallet update failed: ' + walletError.message }, { status: 500 })
-  }
-
-  // Close session and mark credited
-  await supabaseAdmin
-    .from('bot_sessions')
-    .update({
-      status: 'completed',
-      ended_at: new Date().toISOString(),
-      current_pnl: pnl,
-      credited: true,
-    })
-    .eq('id', sessionId)
-
-  return NextResponse.json({ ok: true, newBalance, payout })
 }
