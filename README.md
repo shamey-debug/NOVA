@@ -1,4 +1,4 @@
-# KoolCrypto Starter
+# archespeak Starter
 
 A simple Next.js starter for a crypto learning platform.
 

@@ -72,7 +72,7 @@ const TRADES_HISTORY = [
 export default function BotDetailPage() {
   const [running, setRunning] = useState(true);
   const [logs, setLogs] = useState<{ time: string; type: string; icon: string; msg: string }[]>([
-    { time: "14:32:01.000", type: "info",    icon: "◈", msg: "KoolCrypto Alpha bot initialized" },
+    { time: "14:32:01.000", type: "info",    icon: "◈", msg: "archespeak Alpha bot initialized" },
     { time: "14:32:01.012", type: "info",    icon: "◈", msg: "Connecting to BTC/USDT feed..." },
     { time: "14:32:01.104", type: "success", icon: "✓", msg: "Market data stream connected" },
     { time: "14:32:01.220", type: "info",    icon: "◈", msg: "AI Signal model loaded — v3.2.1" },
@@ -124,12 +124,12 @@ export default function BotDetailPage() {
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <div style={{ width: "28px", height: "28px", background: G.goldDim, border: `1px solid ${G.goldBorder}`, borderRadius: "7px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px" }}>⚡</div>
-            <span style={{ fontSize: "14px", fontWeight: 800, letterSpacing: "0.12em", color: G.gold }}>KoolCrypto</span>
+            <span style={{ fontSize: "14px", fontWeight: 800, letterSpacing: "0.12em", color: G.gold }}>archespeak</span>
           </div>
           <span style={{ color: G.muted, fontSize: "14px" }}>/</span>
           <span style={{ fontSize: "13px", color: G.sec }}>Bots</span>
           <span style={{ color: G.muted, fontSize: "14px" }}>/</span>
-          <span style={{ fontSize: "13px", color: G.text, fontWeight: 600 }}>KoolCrypto Alpha</span>
+          <span style={{ fontSize: "13px", color: G.text, fontWeight: 600 }}>archespeak Alpha</span>
         </div>
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
           <button onClick={() => setRunning(r => !r)} style={{ padding: "7px 20px", borderRadius: "8px", fontSize: "13px", fontWeight: 700, border: "none", background: running ? G.redBg : G.greenBg, color: running ? G.redText : G.greenText, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
@@ -146,11 +146,11 @@ export default function BotDetailPage() {
         <div style={{ background: G.goldDim, border: `1px solid ${G.goldBorder}`, borderRadius: "16px", padding: "24px 28px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-              <h1 style={{ fontSize: "26px", fontWeight: 900, letterSpacing: "-0.02em", margin: 0 }}>KoolCrypto Alpha</h1>
+              <h1 style={{ fontSize: "26px", fontWeight: 900, letterSpacing: "-0.02em", margin: 0 }}>archespeak Alpha</h1>
               <span style={{ fontSize: "11px", padding: "3px 10px", borderRadius: "5px", background: G.purpleBg, color: G.purple, fontWeight: 700, border: `1px solid rgba(139,92,246,0.25)` }}>AI SIGNAL</span>
             </div>
             <div style={{ display: "flex", gap: "16px", fontSize: "12px", color: G.sec }}>
-              <span>Bot ID: KoolCrypto-alpha-01</span>
+              <span>Bot ID: archespeak-alpha-01</span>
               <span>·</span>
               <span>Pair: {pair}</span>
               <span>·</span>

@@ -1,4 +1,4 @@
-// File: C:\Users\hp\Desktop\KoolCrypto\app\dashboard\page.tsx
+// File: C:\Users\hp\Desktop\archespeak\app\dashboard\page.tsx
 import * as entry from '../../../../app/dashboard/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
