@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip,
@@ -39,14 +39,14 @@ const BOTS = [
     icon: '⚡',
     tag: '60 SEC',
     duration: 60,
-    returnRate: 1.0,
+    returnRate: 1.5,           // 150%
     min: 50,
     max: 499,
     color: '#4ade80',
     colorDim: 'rgba(74,222,128,0.10)',
     colorBorder: 'rgba(74,222,128,0.25)',
     tickMs: 500,
-    description: 'Doubles your capital in 60 seconds',
+    description: '150% return on your capital in 60 seconds',
     badge: 'FAST',
   },
   {
@@ -55,14 +55,14 @@ const BOTS = [
     icon: '👑',
     tag: '20 MIN',
     duration: 1200,
-    returnRate: 1.5,
+    returnRate: 2.0,           // 200%
     min: 500,
     max: 9_999_999,
     color: '#F5C518',
     colorDim: 'rgba(245,197,24,0.10)',
     colorBorder: 'rgba(245,197,24,0.22)',
     tickMs: 1000,
-    description: '150% return on premium high-stake positions',
+    description: '200% return on premium high-stake positions',
     badge: 'HIGH STAKE',
   },
 ]
@@ -94,6 +94,70 @@ function fmtCountdown(sec: number) {
   const m = Math.floor(sec / 60)
   const s = sec % 60
   return m > 0 ? `${m}:${String(s).padStart(2, '0')}` : `${s}s`
+}
+
+// ── Toast notification types ──
+type ToastType = 'success' | 'warning' | 'info' | 'error'
+interface Toast {
+  id: number
+  type: ToastType
+  title: string
+  msg: string
+  icon: string
+}
+
+const TOAST_COLORS: Record<ToastType, { bg: string; border: string; title: string; bar: string }> = {
+  success: { bg: 'rgba(22,163,74,0.12)',    border: 'rgba(74,222,128,0.35)',  title: '#4ade80', bar: '#4ade80' },
+  warning: { bg: 'rgba(245,197,24,0.10)',   border: 'rgba(245,197,24,0.35)',  title: '#F5C518', bar: '#F5C518' },
+  info:    { bg: 'rgba(96,165,250,0.10)',   border: 'rgba(96,165,250,0.30)',  title: '#60a5fa', bar: '#60a5fa' },
+  error:   { bg: 'rgba(220,38,38,0.12)',    border: 'rgba(248,113,113,0.35)', title: '#f87171', bar: '#f87171' },
+}
+
+function ToastContainer({ toasts, dismiss }: { toasts: Toast[]; dismiss: (id: number) => void }) {
+  return (
+    <div style={{
+      position: 'fixed', top: 50, right: 14, zIndex: 9999,
+      display: 'flex', flexDirection: 'column', gap: 10,
+      pointerEvents: 'none',
+    }}>
+      {toasts.map(t => {
+        const c = TOAST_COLORS[t.type]
+        return (
+          <div key={t.id} style={{
+            pointerEvents: 'all',
+            width: 310,
+            background: 'rgba(10,10,10,0.97)',
+            border: `1px solid ${c.border}`,
+            borderRadius: 12,
+            overflow: 'hidden',
+            boxShadow: `0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px ${c.border}`,
+            animation: 'toastSlide 0.35s cubic-bezier(0.22,1,0.36,1)',
+          }}>
+            {/* progress bar */}
+            <div style={{ height: 2, background: 'rgba(255,255,255,0.05)' }}>
+              <div style={{
+                height: '100%', background: c.bar,
+                animation: 'toastProgress 4.5s linear forwards',
+                transformOrigin: 'left',
+              }} />
+            </div>
+            <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+              <div style={{
+                width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+                background: c.bg, border: `1px solid ${c.border}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+              }}>{t.icon}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: c.title, marginBottom: 2 }}>{t.title}</div>
+                <div style={{ fontSize: 11, color: G.sec, lineHeight: 1.5 }}>{t.msg}</div>
+              </div>
+              <button onClick={() => dismiss(t.id)} style={{ background: 'none', border: 'none', color: G.muted, cursor: 'pointer', fontSize: 14, padding: 0, flexShrink: 0, marginTop: 2 }}>✕</button>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 function CoinButton({
@@ -153,8 +217,11 @@ export default function Dashboard() {
   const [targetReached, setTargetReached] = useState(false)
   const [countdown,     setCountdown]     = useState(0)
   const [activeBotType, setActiveBotType] = useState('sprint')
-  const simRef   = useRef<NodeJS.Timeout | null>(null)
-  const cdownRef = useRef<NodeJS.Timeout | null>(null)
+  const [stopLoading,   setStopLoading]   = useState(false)
+
+  const simRef      = useRef<NodeJS.Timeout | null>(null)
+  const cdownRef    = useRef<NodeJS.Timeout | null>(null)
+  const pnlRef      = useRef(0)            // live pnl accessible in async handlers
 
   const [showWithdrawModal, setShowWithdrawModal] = useState(false)
   const [withdrawNetwork,   setWithdrawNetwork]   = useState<'BTC' | 'USDT'>('USDT')
@@ -163,6 +230,15 @@ export default function Dashboard() {
   const [withdrawLoading,   setWithdrawLoading]    = useState(false)
   const [withdrawDone,      setWithdrawDone]       = useState(false)
   const [addressError,      setAddressError]       = useState('')
+
+  // ── Toasts ──
+  const [toasts, setToasts] = useState<Toast[]>([])
+  const addToast = useCallback((type: ToastType, title: string, msg: string, icon: string) => {
+    const id = Date.now()
+    setToasts(prev => [...prev, { id, type, title, msg, icon }])
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4800)
+  }, [])
+  const dismissToast = useCallback((id: number) => setToasts(prev => prev.filter(t => t.id !== id)), [])
 
   const [chartData] = useState(() => {
     let p = 1000
@@ -220,6 +296,7 @@ export default function Dashboard() {
     setActiveBotType(stored || 'sprint')
   }, [activeSession?.id])
 
+  // ── Live simulation ──
   useEffect(() => {
     if (!activeSession) return
     setTargetReached(false)
@@ -227,29 +304,43 @@ export default function Dashboard() {
     const botDef     = BOTS.find(b => b.id === activeBotType) || BOTS[0]
     const target     = activeSession.target_profit
     const stopLoss   = activeSession.target_loss
-    const totalTicks = (botDef.duration * 1000) / botDef.tickMs
+    const totalTicks = (botDef.duration * 1000) / botDef.tickMs  // real-time ticks
     let current      = activeSession.current_pnl ?? 0
     let tick         = 0
     let remaining    = botDef.duration
 
+    pnlRef.current = current
     setCountdown(remaining)
     setSimulatedPnl(+current.toFixed(2))
     setPnlHistory([{ t: '0', p: +current.toFixed(2) }])
 
+    // Real-time countdown: decrement 1 per second
     cdownRef.current = setInterval(() => {
       remaining = Math.max(0, remaining - 1)
       setCountdown(remaining)
     }, 1000)
 
+    // Real-time simulation: fires every tickMs (500ms for sprint, 1000ms for titan)
     simRef.current = setInterval(() => {
       tick++
       const progress = Math.min(tick / totalTicks, 1)
       const isTitan  = botDef.id === 'titan'
-      const trend    = target * progress * (isTitan ? 0.010 : 0.022)
-      const noise    = (Math.random() - 0.40) * (target * (isTitan ? 0.018 : 0.055))
-      current        = Math.max(-stopLoss * 0.8, current + trend + noise)
-      current        = Math.min(current, target)
 
+      // trend pushes toward target at a pace that completes near full duration
+      const trend = target * progress * (isTitan ? 0.0045 : 0.018)
+      const noise = (Math.random() - 0.42) * (target * (isTitan ? 0.008 : 0.045))
+      current     = Math.max(-stopLoss * 0.8, current + trend + noise)
+
+      // For Titan: only allow hitting target after 85% of time has elapsed (≥17 min)
+      // For Sprint: allow after 70%
+      const canFinish = progress >= (isTitan ? 0.85 : 0.70)
+      if (!canFinish) {
+        current = Math.min(current, target * 0.88)
+      } else {
+        current = Math.min(current, target)
+      }
+
+      pnlRef.current = current
       setSimulatedPnl(+current.toFixed(2))
       setPnlHistory(prev => [...prev, { t: String(tick), p: +current.toFixed(2) }].slice(-80))
 
@@ -280,6 +371,7 @@ export default function Dashboard() {
     await supabase.from('deposits').insert({ user_id: user.id, currency, amount: amt })
     setDepositLoading(false)
     setDepositDone(true)
+    addToast('info', 'Deposit Submitted', `$${amt} ${currency} deposit pending confirmation.`, '📥')
   }
 
   const handleTrade = async () => {
@@ -312,21 +404,43 @@ export default function Dashboard() {
     setTargetProfit('')
     setTargetLoss('')
     setTradeError('')
+    addToast('success', 'Bot Started', `${selectedBot.name} activated — $${amt.toFixed(2)} deployed.`, selectedBot.icon)
     await loadData(user.id)
+  }
+
+  // ── Close / collect session ──
+  const closeSession = async (session: any, currentPnl: number) => {
+    if (simRef.current)   clearInterval(simRef.current)
+    if (cdownRef.current) clearInterval(cdownRef.current)
+    await fetch('/api/admin/stop-session', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: session.id }),
+    })
+    await fetch('/api/wallet/credit', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id, amount: session.amount + currentPnl }),
+    })
+    await loadData(user.id)
+    setSessions(prev => prev.map(s => s.id === session.id ? { ...s, status: 'completed' } : s))
   }
 
   const handleCloseSession = async () => {
     if (!activeSession) return
-    await fetch('/api/admin/stop-session', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: activeSession.id }),
-    })
-    await fetch('/api/wallet/credit', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: user.id, amount: activeSession.amount + simulatedPnl }),
-    })
-    await loadData(user.id)
-    setSessions(prev => prev.map(s => s.id === activeSession.id ? { ...s, status: 'completed' } : s))
+    const pnl = pnlRef.current
+    await closeSession(activeSession, pnl)
+    addToast('success', 'Trade Closed', `Session closed · Profit: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} credited.`, '✅')
+  }
+
+  // ── Force stop (stop override) ──
+  const handleForceStop = async () => {
+    if (!activeSession || stopLoading) return
+    const confirmed = window.confirm('Force stop this trade? Your current P&L will be credited.')
+    if (!confirmed) return
+    setStopLoading(true)
+    const pnl = pnlRef.current
+    await closeSession(activeSession, pnl)
+    addToast('warning', 'Trade Force Stopped', `Stopped early · ${pnl >= 0 ? 'Profit' : 'Loss'}: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} settled.`, '⏹')
+    setStopLoading(false)
   }
 
   const handleWithdraw = async () => {
@@ -341,7 +455,6 @@ export default function Dashboard() {
     }
     setWithdrawLoading(true)
     await supabase.from('withdrawals').insert({ user_id: user.id, amount: amt, address: withdrawAddress, status: 'pending' })
-    // Deduct balance immediately
     await fetch('/api/wallet/deduct', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -350,6 +463,7 @@ export default function Dashboard() {
     await loadData(user.id)
     setWithdrawLoading(false)
     setWithdrawDone(true)
+    addToast('info', 'Withdrawal Requested', `$${amt} ${withdrawNetwork} withdrawal is being processed.`, '💸')
   }
 
   const handleLogout = async () => {
@@ -362,7 +476,6 @@ export default function Dashboard() {
     : 0
   const activeBotDef = BOTS.find(b => b.id === activeBotType) || BOTS[0]
 
-  // Can user actually start trading?
   const canTrade = !activeSession && balance >= selectedBot.min
 
   if (loading) return (
@@ -374,13 +487,18 @@ export default function Dashboard() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: G.bg, color: G.text, fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif", overflow: 'hidden' }}>
       <style>{`
-        @keyframes ticker { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
-        @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes pulse  { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        @keyframes ticker      { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+        @keyframes fadeUp      { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes pulse       { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        @keyframes toastSlide  { from{opacity:0;transform:translateX(60px)} to{opacity:1;transform:translateX(0)} }
+        @keyframes toastProgress { from{transform:scaleX(1)} to{transform:scaleX(0)} }
         * { -webkit-tap-highlight-color:transparent; box-sizing:border-box; }
         input[type=number]::-webkit-inner-spin-button,
         input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
       `}</style>
+
+      {/* ── TOAST CONTAINER ── */}
+      <ToastContainer toasts={toasts} dismiss={dismissToast} />
 
       {/* TICKER */}
       <div style={{ height: 34, background: 'rgba(245,197,24,0.03)', borderBottom: `1px solid ${G.goldBorder}`, display: 'flex', alignItems: 'center', overflow: 'hidden', flexShrink: 0 }}>
@@ -399,12 +517,12 @@ export default function Dashboard() {
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
-        {/* Desktop sidebar */}
+        {/* Desktop sidebar — only Home & Deposit */}
         {!isMobile && (
           <aside style={{ width: 56, borderRight: `1px solid ${G.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 12, gap: 4, flexShrink: 0 }}>
             <div style={{ width: 34, height: 34, background: G.goldDim, border: `1px solid ${G.goldBorder}`, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, marginBottom: 12 }}>⚡</div>
             {(['home', 'deposit'] as const).map((key) => {
-              const icons: Record<string, string> = { home: '▦', deposit: '↑' }
+              const icons:  Record<string, string> = { home: '▦', deposit: '↑' }
               const labels: Record<string, string> = { home: 'Dashboard', deposit: 'Deposit' }
               return (
                 <div key={key} title={labels[key]} onClick={() => setView(key)}
@@ -413,6 +531,7 @@ export default function Dashboard() {
                 </div>
               )
             })}
+            {/* Logout avatar */}
             <div onClick={handleLogout} title="Logout"
               style={{ marginTop: 'auto', marginBottom: 16, width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: G.gold, cursor: 'pointer' }}>
               {user?.email?.[0]?.toUpperCase()}
@@ -453,10 +572,10 @@ export default function Dashboard() {
                 {/* Stats */}
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 10 }}>
                   {[
-                    { label: 'Wallet Balance',  value: `$${balance.toFixed(2)}`,                                       color: G.gold },
-                    { label: 'Active Sessions', value: sessions.filter(s => s.status === 'active').length,             color: G.greenText },
-                    { label: 'Total P&L',       value: `${totalPnl >= 0 ? '+' : ''}$${totalPnl.toFixed(2)}`,          color: totalPnl >= 0 ? G.greenText : G.redText },
-                    { label: 'Total Deposits',  value: deposits.length,                                                 color: G.text },
+                    { label: 'Wallet Balance',  value: `$${balance.toFixed(2)}`,                                      color: G.gold },
+                    { label: 'Active Sessions', value: sessions.filter(s => s.status === 'active').length,            color: G.greenText },
+                    { label: 'Total P&L',       value: `${totalPnl >= 0 ? '+' : ''}$${totalPnl.toFixed(2)}`,         color: totalPnl >= 0 ? G.greenText : G.redText },
+                    { label: 'Total Deposits',  value: deposits.length,                                                color: G.text },
                   ].map(s => (
                     <div key={s.label} style={{ background: G.bg2, border: `1px solid ${G.border}`, borderRadius: 12, padding: '14px 16px' }}>
                       <div style={{ fontSize: 10, color: G.muted, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</div>
@@ -465,14 +584,13 @@ export default function Dashboard() {
                   ))}
                 </div>
 
-                {/* ── BOT CARDS — always visible, always selectable ── */}
+                {/* Bot cards */}
                 <div>
                   <div style={{ fontSize: 11, color: G.muted, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Trading Bots</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                     {BOTS.map(b => {
                       const isSelected = selectedBot.id === b.id && !activeSession
                       const isLive     = activeSession && activeBotType === b.id
-                      // Always allow selection — never disable bot cards
                       return (
                         <div key={b.id}
                           onClick={() => !activeSession && setSelectedBot(b)}
@@ -486,16 +604,12 @@ export default function Dashboard() {
                             position: 'relative',
                             overflow: 'hidden',
                           }}>
-
-                          {/* Badge top-right */}
                           <span style={{ position: 'absolute', top: 10, right: 10, fontSize: 8, padding: '2px 8px', borderRadius: 4, background: isLive ? 'rgba(74,222,128,0.15)' : b.colorDim, border: `1px solid ${isLive ? G.greenText : b.colorBorder}`, color: isLive ? G.greenText : b.color, fontWeight: 800, letterSpacing: '0.08em' }}>
                             {isLive ? '● LIVE' : b.badge}
                           </span>
-
                           <div style={{ fontSize: isMobile ? 26 : 30, marginBottom: 8 }}>{b.icon}</div>
                           <div style={{ fontSize: 15, fontWeight: 800, color: isSelected || isLive ? b.color : G.text, marginBottom: 4 }}>{b.name}</div>
                           <div style={{ fontSize: 11, color: G.muted, marginBottom: 14, lineHeight: 1.5 }}>{b.description}</div>
-
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                             <div>
                               <div style={{ fontSize: isMobile ? 22 : 26, fontWeight: 900, color: b.color, lineHeight: 1 }}>+{b.returnRate * 100}%</div>
@@ -506,7 +620,6 @@ export default function Dashboard() {
                               <div style={{ fontSize: 10, color: G.muted }}>Min ${b.min}</div>
                             </div>
                           </div>
-
                           {(isSelected || isLive) && (
                             <div style={{ marginTop: 12, height: 2, background: `linear-gradient(90deg, ${b.color}, transparent)`, borderRadius: 1 }} />
                           )}
@@ -542,6 +655,21 @@ export default function Dashboard() {
                           <div style={{ fontFamily: 'monospace', fontSize: 14, fontWeight: 800, color: activeBotDef.color, background: activeBotDef.colorDim, border: `1px solid ${activeBotDef.colorBorder}`, padding: '4px 12px', borderRadius: 7 }}>
                             ⏱ {fmtCountdown(countdown)}
                           </div>
+                        )}
+                        {/* ── FORCE STOP BUTTON ── */}
+                        {!targetReached && (
+                          <button
+                            onClick={handleForceStop}
+                            disabled={stopLoading}
+                            style={{
+                              padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 800,
+                              background: 'rgba(220,38,38,0.12)', border: `1px solid rgba(248,113,113,0.4)`,
+                              color: G.redText, cursor: stopLoading ? 'not-allowed' : 'pointer',
+                              opacity: stopLoading ? 0.5 : 1, letterSpacing: '0.04em',
+                              display: 'flex', alignItems: 'center', gap: 5,
+                            }}>
+                            {stopLoading ? '⏳ Stopping...' : '⏹ Stop Trade'}
+                          </button>
                         )}
                       </div>
                     </div>
@@ -624,7 +752,7 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* ── CONFIGURE TRADE FORM — always shown when no active session ── */}
+                {/* Configure trade form */}
                 {!activeSession && (
                   <div style={{ background: G.bg2, border: `1px solid ${G.border}`, borderRadius: 16, padding: isMobile ? 18 : 24, display: 'flex', flexDirection: 'column', gap: 16, animation: 'fadeUp 0.3s ease' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
@@ -641,7 +769,6 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    {/* Amount input */}
                     <div>
                       <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>Trade Amount (USD)</div>
                       <input
@@ -652,7 +779,6 @@ export default function Dashboard() {
                         disabled={!canTrade}
                         style={{ width: '100%', background: canTrade ? G.bg3 : 'rgba(255,255,255,0.02)', border: `1px solid ${G.border}`, borderRadius: 10, padding: '14px 16px', fontSize: 16, color: canTrade ? G.text : G.muted, outline: 'none', cursor: canTrade ? 'text' : 'not-allowed' }}
                       />
-                      {/* Quick picks */}
                       <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                         {[50, 100, 200, 500, 1000]
                           .filter(v => v >= selectedBot.min)
@@ -673,7 +799,6 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    {/* Projected profit */}
                     {tradeAmount && parseFloat(tradeAmount) >= selectedBot.min && canTrade && (
                       <div style={{ padding: 14, background: selectedBot.colorDim, border: `1px solid ${selectedBot.colorBorder}`, borderRadius: 12 }}>
                         <div style={{ fontSize: 11, color: G.muted, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Projected Profit</div>
@@ -687,7 +812,6 @@ export default function Dashboard() {
                       </div>
                     )}
 
-                    {/* Stop loss */}
                     <div>
                       <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>Stop Loss at ($)</div>
                       <input
@@ -704,14 +828,12 @@ export default function Dashboard() {
                       <div style={{ fontSize: 12, color: G.redText, padding: '10px 14px', background: G.redBg, borderRadius: 8 }}>{tradeError}</div>
                     )}
 
-                    {/* ── START BUTTON — gated on balance ── */}
                     {canTrade ? (
                       <button onClick={handleTrade} disabled={tradeLoading}
                         style={{ background: selectedBot.color, color: '#000', fontWeight: 900, fontSize: 15, padding: 17, borderRadius: 12, border: 'none', cursor: 'pointer', opacity: tradeLoading ? 0.6 : 1, letterSpacing: '0.02em' }}>
                         {tradeLoading ? 'Starting...' : `▶ Start ${selectedBot.name}`}
                       </button>
                     ) : (
-                      /* Not enough balance — show deposit CTA instead */
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                         <div style={{ padding: '14px 16px', background: 'rgba(245,197,24,0.06)', border: `1px solid ${G.goldBorder}`, borderRadius: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
                           <span style={{ fontSize: 22 }}>🔒</span>
@@ -853,27 +975,24 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* MOBILE BOTTOM NAV */}
+      {/* MOBILE BOTTOM NAV — only functional tabs */}
       {isMobile && (
         <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: 62, background: 'rgba(8,8,8,0.97)', borderTop: `1px solid ${G.border}`, backdropFilter: 'blur(16px)', display: 'flex', alignItems: 'center', zIndex: 50 }}>
           {([
-            { icon: '▦', label: 'Home',    action: () => setView('home') },
-            { icon: '↑', label: 'Deposit', action: () => setView('deposit') },
-            { icon: '◎', label: 'Trade',   action: () => setView('home') },
-          ] as const).map(n => {
-            const active = n.label === 'Home' ? view === 'home' : n.label === 'Deposit' ? view === 'deposit' : false
-            return (
-              <div key={n.label} onClick={n.action}
-                style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer', padding: '8px 0' }}>
-                <div style={{ fontSize: 20, color: active ? G.gold : G.muted }}>{n.icon}</div>
-                <div style={{ fontSize: 9, color: active ? G.gold : G.muted, fontWeight: active ? 700 : 400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{n.label}</div>
-              </div>
-            )
-          })}
+            { icon: '▦', label: 'Home',    action: () => setView('home'),    active: view === 'home' },
+            { icon: '↑', label: 'Deposit', action: () => setView('deposit'), active: view === 'deposit' },
+          ] as const).map(n => (
+            <div key={n.label} onClick={n.action}
+              style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer', padding: '8px 0' }}>
+              <div style={{ fontSize: 20, color: n.active ? G.gold : G.muted }}>{n.icon}</div>
+              <div style={{ fontSize: 9, color: n.active ? G.gold : G.muted, fontWeight: n.active ? 700 : 400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{n.label}</div>
+            </div>
+          ))}
+          {/* Logout */}
           <div onClick={handleLogout}
             style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer', padding: '8px 0' }}>
             <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: G.gold }}>{user?.email?.[0]?.toUpperCase()}</div>
-            <div style={{ fontSize: 9, color: G.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Account</div>
+            <div style={{ fontSize: 9, color: G.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Logout</div>
           </div>
         </div>
       )}
