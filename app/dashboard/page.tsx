@@ -387,18 +387,17 @@ export default function Dashboard() {
     const pnl = pnlRef.current
 
     const collect = async () => {
-      // Stop session in DB
-      await fetch('/api/admin/stop-session', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: session.id }),
+      if (simRef.current)   clearInterval(simRef.current)
+      if (cdownRef.current) clearInterval(cdownRef.current)
+
+      const res = await fetch('/api/wallet/collect-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: session.id, userId: uid.id, pnl }),
       })
-      // Credit principal + profit
-      const creditRes = await fetch('/api/wallet/credit', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: uid.id, amount: session.amount + pnl }),
-      })
-      if (!creditRes.ok) {
-        addToast('error', 'Credit Failed', 'Could not credit wallet — tap Collect below.', '⚠️')
+      const data = await res.json()
+      if (!res.ok) {
+        addToast('error', 'Credit Failed', data.error ?? 'Could not credit wallet.', '⚠️')
         return
       }
       await loadData(uid.id)
@@ -807,8 +806,12 @@ export default function Dashboard() {
                             const uid     = userRef.current
                             if (!session || !uid) return
                             const pnl = pnlRef.current
-                            await fetch('/api/admin/stop-session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: session.id }) })
-                            await fetch('/api/wallet/credit',      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: uid.id, amount: session.amount + pnl }) })
+                            const res = await fetch('/api/wallet/collect-session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: session.id, userId: uid.id, pnl }) })
+                            const data = await res.json()
+                            if (!res.ok) {
+                              addToast('error', 'Credit Failed', data.error ?? 'Could not credit wallet.', '⚠️')
+                              return
+                            }
                             await loadData(uid.id)
                             setSessions(prev => prev.map(s => s.id === session.id ? { ...s, status: 'completed' } : s))
                             addToast('success', 'Profit Collected', `$${(session.amount + pnl).toFixed(2)} added to wallet.`, '💰')

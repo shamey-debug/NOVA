@@ -15,7 +15,7 @@ export async function POST(req: Request) {
     // Get session
     const { data: session, error: sessionError } = await supabaseAdmin
       .from('bot_sessions')
-      .select('amount')
+      .select('amount, status')
       .eq('id', sessionId)
       .single()
 
@@ -23,6 +23,13 @@ export async function POST(req: Request) {
 
     if (!session) {
       return NextResponse.json({ error: 'Session not found: ' + sessionError?.message }, { status: 404 })
+    }
+
+    // Prevent double-credit: if already completed, skip
+    if (session.status === 'completed') {
+      const { data: wallet } = await supabaseAdmin.from('wallets').select('balance').eq('user_id', userId).single()
+      console.log('session already completed, skipping credit')
+      return NextResponse.json({ ok: true, skipped: true, newBalance: wallet?.balance ?? 0 })
     }
 
     // Get wallet
