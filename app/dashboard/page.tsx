@@ -1114,7 +1114,23 @@ export default function Dashboard() {
               <div style={{ textAlign: 'center', padding: 20 }}>
                 <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
                 <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>Withdrawal Requested</div>
-                <div style={{ fontSize: 13, color: G.muted, marginBottom: 20 }}>Your withdrawal has been processed successfully.</div>
+                <div style={{ fontSize: 13, color: G.muted, marginBottom: 16 }}>Your withdrawal has been processed successfully.</div>
+
+                {/* Next Steps notice */}
+                <div style={{ background: 'rgba(255,193,7,0.08)', border: '1px solid rgba(255,193,7,0.25)', borderRadius: 10, padding: '14px 16px', marginBottom: 16, textAlign: 'left' }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: G.gold, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Next Steps</div>
+                  <div style={{ fontSize: 12, color: G.muted, lineHeight: 1.6 }}>
+                    • PLEASE DEPOSIT AND COMPLETE AT LEAST <strong style={{ color: '#fff' }}>3 TRADES</strong> TO ENABLE THE WITHDRAWAL FEATURE ON YOUR ACCOUNT.
+                  </div>
+                </div>
+
+                {/* Contact Support */}
+                <div style={{ fontSize: 11, color: G.muted, marginBottom: 20, lineHeight: 1.7 }}>
+                  <div style={{ fontWeight: 700, color: '#ccc', marginBottom: 2 }}>Contact Support</div>
+                  <div>Email: <span style={{ color: G.gold }}>Info@archespeak.com</span></div>
+                  <div>Support Hours: Monday – Friday, 9 AM – 6 PM</div>
+                </div>
+
                 <button onClick={() => { setShowWithdrawModal(false); setWithdrawDone(false); setWithdrawAmount(''); setWithdrawAddress('') }}
                   style={{ background: G.goldDim, color: G.gold, border: `1px solid ${G.goldBorder}`, fontWeight: 700, fontSize: 13, padding: '12px 28px', borderRadius: 10, cursor: 'pointer' }}>
                   Done
