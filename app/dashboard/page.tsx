@@ -1016,9 +1016,9 @@ export default function Dashboard() {
                       </div>
                       <div>
                         <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>Amount (USD equivalent)</div>
-                        <input type="number" placeholder="Min. $50" value={depositAmount} onChange={e => setDepositAmount(e.target.value)}
+                        <input type="number" placeholder="Min. $85" value={depositAmount} onChange={e => setDepositAmount(e.target.value)}
                           style={{ width: '100%', background: G.bg3, border: `1px solid ${G.border}`, borderRadius: 10, padding: '14px 16px', fontSize: 16, color: G.text, outline: 'none' }} />
-                        {depositAmount && parseFloat(depositAmount) >= 50 && (
+                        {depositAmount && parseFloat(depositAmount) >= 85 && (
                           <div style={{ fontSize: 12, color: G.greenText, marginTop: 6 }}>
                             Credited: <strong>${(parseFloat(depositAmount) - 1).toFixed(2)}</strong> after $1 fee
                           </div>
