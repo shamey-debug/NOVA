@@ -40,7 +40,7 @@ const BOTS = [
     tag: '60 SEC',
     duration: 60,
     returnRate: 1.5,           // 150%
-    min: 50,
+    min: 85,
     max: 499,
     color: '#4ade80',
     colorDim: 'rgba(74,222,128,0.10)',
