@@ -90,6 +90,13 @@ export default function AdminPage() {
   const [addrSaving,     setAddrSaving]     = useState(false)
   const [addrSaved,      setAddrSaved]      = useState(false)
 
+  // Settings — tutorial page
+  const [tutVideoUrl,    setTutVideoUrl]    = useState('')
+  const [tutTelegram,    setTutTelegram]    = useState('')
+  const [tutWhatsapp,    setTutWhatsapp]    = useState('')
+  const [tutSaving,      setTutSaving]      = useState(false)
+  const [tutSaved,       setTutSaved]       = useState(false)
+
   // Toast
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null)
   const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
@@ -124,12 +131,15 @@ export default function AdminPage() {
     const { data } = await supabase
       .from('app_config')
       .select('key, value')
-      .in('key', ['wallet_btc', 'wallet_usdt', 'support_whatsapp'])
+      .in('key', ['wallet_btc', 'wallet_usdt', 'support_whatsapp', 'tutorial_video_url', 'tutorial_telegram_link', 'tutorial_whatsapp_link'])
     if (data) {
       data.forEach((row: any) => {
-        if (row.key === 'wallet_btc')       setBtcAddr(row.value)
-        if (row.key === 'wallet_usdt')      setUsdtAddr(row.value)
-        if (row.key === 'support_whatsapp') setWhatsappNumber(row.value)
+        if (row.key === 'wallet_btc')                setBtcAddr(row.value)
+        if (row.key === 'wallet_usdt')                setUsdtAddr(row.value)
+        if (row.key === 'support_whatsapp')           setWhatsappNumber(row.value)
+        if (row.key === 'tutorial_video_url')         setTutVideoUrl(row.value)
+        if (row.key === 'tutorial_telegram_link')     setTutTelegram(row.value)
+        if (row.key === 'tutorial_whatsapp_link')     setTutWhatsapp(row.value)
       })
     }
   }
@@ -226,6 +236,26 @@ export default function AdminPage() {
       showToast('Deposit addresses saved')
     } else {
       showToast('Failed to save addresses', 'err')
+    }
+  }
+
+  // ── Tutorial page ──
+  const saveTutorialSettings = async () => {
+    setTutSaving(true)
+    const { error } = await supabase
+      .from('app_config')
+      .upsert([
+        { key: 'tutorial_video_url',     value: tutVideoUrl.trim() },
+        { key: 'tutorial_telegram_link', value: tutTelegram.trim() },
+        { key: 'tutorial_whatsapp_link', value: tutWhatsapp.trim() },
+      ], { onConflict: 'key' })
+    setTutSaving(false)
+    if (!error) {
+      setTutSaved(true)
+      setTimeout(() => setTutSaved(false), 2500)
+      showToast('Tutorial page settings saved')
+    } else {
+      showToast('Failed to save tutorial settings', 'err')
     }
   }
 
@@ -559,6 +589,69 @@ export default function AdminPage() {
               disabled={addrSaving}
               style={{ background: addrSaved ? G.greenBg : G.gold, color: addrSaved ? G.greenText : '#000', border: addrSaved ? `1px solid ${G.greenText}` : 'none', fontWeight: 800, fontSize: 14, padding: '13px 28px', borderRadius: 10, cursor: 'pointer', opacity: addrSaving ? 0.6 : 1, transition: 'all 0.3s' }}>
               {addrSaving ? 'Saving...' : addrSaved ? '✓ Saved!' : 'Save Addresses'}
+            </button>
+          </div>
+
+          {/* Tutorial page card */}
+          <div style={{ background: G.bg2, border: `1px solid ${G.border}`, borderRadius: 16, padding: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <div style={{ fontSize: 15, fontWeight: 800 }}>Tutorial Page</div>
+              <a href="/tutorial" target="_blank" rel="noopener noreferrer"
+                style={{ fontSize: 11, color: G.gold, textDecoration: 'none', fontWeight: 700 }}>
+                View live →
+              </a>
+            </div>
+            <div style={{ fontSize: 12, color: G.muted, marginBottom: 20 }}>
+              Controls the clip and buttons shown at archespeak.com/tutorial.
+            </div>
+
+            {/* Video URL */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Tutorial Video URL</div>
+              <input
+                type="text"
+                placeholder="YouTube, Vimeo, or direct .mp4 link"
+                value={tutVideoUrl}
+                onChange={e => setTutVideoUrl(e.target.value)}
+                style={{ width: '100%', background: G.bg3, border: `1px solid ${G.border}`, borderRadius: 10, padding: '12px 14px', fontSize: 12, color: G.text, outline: 'none', fontFamily: 'monospace' }}
+              />
+            </div>
+
+            {/* Telegram link */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#229ED9"><path d="M9.417 15.181l-.397 5.584c.568 0 .814-.244 1.109-.537l2.663-2.545 5.518 4.041c1.012.564 1.725.267 1.998-.931L23.98 3.096c.399-1.816-.579-2.523-1.934-2.06L1.75 9.302c-1.708.667-1.688 1.62-.293 2.06l5.242 1.635 12.192-7.678c.575-.398 1.099-.178.667.223L9.417 15.181z"/></svg>
+                <span style={{ fontSize: 12, fontWeight: 700 }}>Telegram Button Link</span>
+              </div>
+              <input
+                type="text"
+                placeholder="https://t.me/yourchannel"
+                value={tutTelegram}
+                onChange={e => setTutTelegram(e.target.value)}
+                style={{ width: '100%', background: G.bg3, border: `1px solid ${G.border}`, borderRadius: 10, padding: '12px 14px', fontSize: 12, color: '#229ED9', outline: 'none', fontFamily: 'monospace', letterSpacing: '0.03em' }}
+              />
+            </div>
+
+            {/* WhatsApp link */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#25d366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.126 1.535 5.859L.057 23.428a.75.75 0 0 0 .906.919l5.687-1.494A11.934 11.934 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.75a9.718 9.718 0 0 1-4.953-1.354l-.355-.212-3.683.968.983-3.589-.232-.369A9.718 9.718 0 0 1 2.25 12C2.25 6.615 6.615 2.25 12 2.25S21.75 6.615 21.75 12 17.385 21.75 12 21.75z"/></svg>
+                <span style={{ fontSize: 12, fontWeight: 700 }}>WhatsApp Button Link</span>
+              </div>
+              <input
+                type="text"
+                placeholder="https://wa.me/1234567890 or +44 7000 000000"
+                value={tutWhatsapp}
+                onChange={e => setTutWhatsapp(e.target.value)}
+                style={{ width: '100%', background: G.bg3, border: `1px solid ${G.border}`, borderRadius: 10, padding: '12px 14px', fontSize: 12, color: '#25d366', outline: 'none', fontFamily: 'monospace', letterSpacing: '0.03em' }}
+              />
+            </div>
+
+            <button
+              onClick={saveTutorialSettings}
+              disabled={tutSaving}
+              style={{ background: tutSaved ? G.greenBg : G.gold, color: tutSaved ? G.greenText : '#000', border: tutSaved ? `1px solid ${G.greenText}` : 'none', fontWeight: 800, fontSize: 14, padding: '13px 28px', borderRadius: 10, cursor: 'pointer', opacity: tutSaving ? 0.6 : 1, transition: 'all 0.3s' }}>
+              {tutSaving ? 'Saving...' : tutSaved ? '✓ Saved!' : 'Save Tutorial Settings'}
             </button>
           </div>
 
