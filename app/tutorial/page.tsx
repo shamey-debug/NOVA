@@ -23,6 +23,12 @@ function getEmbedSrc(url: string): string | null {
   return null
 }
 
+function getOembedUrl(url: string): string | null {
+  if (/youtube\.com|youtu\.be/.test(url)) return `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`
+  if (/vimeo\.com/.test(url)) return `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(url)}`
+  return null
+}
+
 function toWhatsappHref(value: string): string {
   if (!value) return ''
   if (value.startsWith('http')) return value
@@ -41,6 +47,7 @@ export default function TutorialPage() {
   const [telegramLink, setTelegramLink] = useState('')
   const [whatsappLink, setWhatsappLink] = useState('')
   const [loading, setLoading] = useState(true)
+  const [ratio, setRatio] = useState(16 / 9)
 
   useEffect(() => {
     fetch('/api/tutorial-config')
@@ -53,7 +60,20 @@ export default function TutorialPage() {
       .finally(() => setLoading(false))
   }, [])
 
+  useEffect(() => {
+    if (!videoUrl) return
+    const oembedUrl = getOembedUrl(videoUrl)
+    if (!oembedUrl) return
+    fetch(oembedUrl)
+      .then(res => res.json())
+      .then(data => {
+        if (data.width && data.height) setRatio(data.width / data.height)
+      })
+      .catch(() => {})
+  }, [videoUrl])
+
   const embedSrc = videoUrl ? getEmbedSrc(videoUrl) : null
+  const isPortrait = ratio < 1
 
   return (
     <div style={{
@@ -93,7 +113,9 @@ export default function TutorialPage() {
         {/* Video */}
         <div style={{
           background: G.bg2, border: `1px solid ${G.border}`, borderRadius: 16,
-          overflow: 'hidden', aspectRatio: '16 / 9', marginBottom: 32,
+          overflow: 'hidden', aspectRatio: ratio, marginBottom: 32,
+          width: isPortrait ? 'min(360px, 100%)' : '100%',
+          maxHeight: '80vh', margin: '0 auto 32px',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           {loading ? (
@@ -106,7 +128,15 @@ export default function TutorialPage() {
               allowFullScreen
             />
           ) : videoUrl ? (
-            <video controls style={{ width: '100%', height: '100%' }} src={videoUrl} />
+            <video
+              controls
+              style={{ width: '100%', height: '100%' }}
+              src={videoUrl}
+              onLoadedMetadata={e => {
+                const v = e.currentTarget
+                if (v.videoWidth && v.videoHeight) setRatio(v.videoWidth / v.videoHeight)
+              }}
+            />
           ) : (
             <span style={{ color: G.muted, fontSize: 13 }}>Tutorial video coming soon</span>
           )}
